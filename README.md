@@ -78,6 +78,28 @@ cache-aware routing, queue visibility, and speculation charts. Plain
 llama.cpp/Ollama backends work too — telemetry-dependent features simply stay
 quiet.
 
+### Ollama
+
+Point the backend base URL at Ollama's root — relai forwards the client's
+`/v1/...` path onto it, which lands on Ollama's built-in OpenAI-compatible
+endpoint:
+
+```
+http://ollama-host:11434
+```
+
+Do **not** add a `/v1` suffix to the backend URL; relai appends the request
+path itself, and a suffix would double it. Model names are whatever
+`ollama list` shows. (Relai also *speaks* Ollama's native API to clients —
+`/api/chat`, `/api/generate`, `/api/tags` — so Ollama apps can target relai
+directly.)
+
+### llama.cpp / Halogen
+
+Same convention: base URL is the server root (`http://host:8080` for llama.cpp
+server — its `/v1/chat/completions` endpoint receives the forwarded path).
+Halogen flash-server additionally unlocks the telemetry features above.
+
 ## Configuration
 
 See `.env.example` for the full list. Highlights:
