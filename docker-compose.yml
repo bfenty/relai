@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: relai-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-relai_logs}
+      - POSTGRES_USER=${POSTGRES_USER:-relai}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-relai}
+    volumes:
+      - relai-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  relai:
+    build: .
+    container_name: relai
+    ports:
+      - "8081:8080"
+    environment:
+      - RELAI_PORT=8080
+      - RELAI_HOST=0.0.0.0
+      - RELAI_DB_PATH=/data/relai.db
+      - RELAI_LOG_DB_URL=${RELAI_LOG_DB_URL:-postgres://relai:relai@postgres:5432/relai_logs?sslmode=disable}
+      - RELAI_REQUIRE_POSTGRES_LOGS=${RELAI_REQUIRE_POSTGRES_LOGS:-true}
+      - RELAI_ADMIN_KEY=${RELAI_ADMIN_KEY:-}
+      - RELAI_ADMIN_USERNAME=${RELAI_ADMIN_USERNAME:-admin}
+      - RELAI_ADMIN_PASSWORD=${RELAI_ADMIN_PASSWORD:-}
+      - RELAI_SECURE_COOKIES=${RELAI_SECURE_COOKIES:-false}
+      - RELAI_READY_REQUIRE_MODELS=${RELAI_READY_REQUIRE_MODELS:-false}
+    volumes:
+      - relai-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  relai-data:
+  relai-postgres:

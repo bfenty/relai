@@ -1,0 +1,1781 @@
+openapi: "3.1.0"
+info:
+  title: Relai API
+  description: |
+    Relai is an LLM proxy and gateway. It exposes an OpenAI-compatible inference API
+    and an admin API for managing backends, API keys, routing rules, model mappings,
+    virtual routers, MCP servers, and users.
+
+    **Authentication**
+
+    | Endpoint group | Accepted credentials |
+    |---|---|
+    | `/v1/*`, `/v2/*`, `/mcp` | `Authorization: Bearer <api_key>` (DB-managed key, prefix `rlai_`) |
+    | Admin `/api/*`   | `Authorization: Bearer <admin_key>` (env) or `relai_session` cookie |
+
+    Admin API keys (bearer tokens) are managed at `/api/keys`.
+    User-facing inference keys are also managed there and carry per-key scopes,
+    rate limits, and allowed-backend/model restrictions.
+  version: "1.0.0"
+
+servers:
+  - url: /
+    description: Same-origin
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: "`rlai_` prefixed API key for inference endpoints, or admin key for /api/*"
+    AdminCookieAuth:
+      type: apiKey
+      in: cookie
+      name: relai_session
+      description: Session cookie from POST /api/auth/login
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Backend:
+      type: object
+      properties:
+        id:                { type: integer }
+        name:              { type: string }
+        base_url:          { type: string, format: uri }
+        api_key:           { type: string, description: "Omitted in list responses" }
+        weight:            { type: integer, default: 1 }
+        status:            { type: string, enum: [active, inactive, error] }
+        color:             { type: string, example: "#3b82f6" }
+        last_latency_ms:   { type: integer }
+        last_health_check: { type: string, format: date-time, nullable: true }
+        created_at:        { type: string, format: date-time }
+        updated_at:        { type: string, format: date-time }
+
+    BackendInput:
+      type: object
+      required: [name, base_url]
+      properties:
+        name:    { type: string }
+        base_url: { type: string, format: uri }
+        api_key: { type: string }
+        weight:  { type: integer, default: 1 }
+        status:  { type: string, enum: [active, inactive] }
+        color:   { type: string }
+
+    APIKey:
+      type: object
+      properties:
+        id:                   { type: integer }
+        key_prefix:           { type: string, example: "rlai_a1b2c3..." }
+        name:                 { type: string }
+        owner:                { type: string }
+        user_id:              { type: integer, nullable: true }
+        scopes:               { type: array, items: { type: string } }
+        expires_at:           { type: string, format: date-time, nullable: true }
+        rate_limit_rpm:       { type: integer, description: "Requests per minute; 0 = unlimited" }
+        rate_limit_remaining: { type: integer }
+        rate_limit_reset_at:  { type: string, format: date-time, nullable: true }
+        allowed_backends:     { type: array, items: { type: integer } }
+        allowed_models:       { type: array, items: { type: string } }
+        is_active:            { type: boolean }
+        is_test:              { type: boolean }
+        last_used_at:         { type: string, format: date-time, nullable: true }
+        total_cost:           { type: number }
+        total_requests:       { type: integer }
+        created_at:           { type: string, format: date-time }
+        updated_at:           { type: string, format: date-time }
+
+    APIKeyInput:
+      type: object
+      required: [name, owner]
+      properties:
+        name:             { type: string }
+        owner:            { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+          description: "Default: [inference, models:read, embeddings, rerank]"
+          example: ["inference", "models:read"]
+        expires_at:       { type: string, format: date-time, nullable: true }
+        rate_limit_rpm:   { type: integer, default: 0 }
+        user_id:          { type: integer, nullable: true }
+        allowed_backends: { type: array, items: { type: integer } }
+        allowed_models:   { type: array, items: { type: string } }
+        is_active:        { type: boolean, default: true }
+        is_test:          { type: boolean, default: false }
+
+    RoutingRule:
+      type: object
+      properties:
+        id:         { type: integer }
+        name:       { type: string }
+        strategy:   { type: string, example: "round_robin" }
+        priority:   { type: integer }
+        conditions: { type: object }
+        config:     { type: object }
+        is_active:  { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    RoutingRuleInput:
+      type: object
+      required: [name, strategy]
+      properties:
+        name:       { type: string }
+        strategy:
+          type: string
+          enum: [round_robin, weighted, model_based, cost_based, latency_based]
+        priority:   { type: integer, default: 0 }
+        conditions: { type: object }
+        config:     { type: object }
+        is_active:  { type: boolean, default: true }
+
+    ModelMap:
+      type: object
+      properties:
+        id:                     { type: integer }
+        backend_id:             { type: integer }
+        remote_model:           { type: string, description: "Model name sent to the backend" }
+        local_model:            { type: string, description: "Model name the client sends" }
+        base_url:               { type: string }
+        status:                 { type: string, enum: [active, inactive, error] }
+        last_latency_ms:        { type: integer }
+        last_health_check:      { type: string, format: date-time, nullable: true }
+        params:                 { type: string }
+        input_cost_per_million: { type: number }
+        output_cost_per_million: { type: number }
+        model_type:             { type: string, enum: [chat, embedding, rerank] }
+        modes:                  { type: array, items: { type: string } }
+
+    Router:
+      type: object
+      properties:
+        id:                    { type: integer }
+        name:                  { type: string }
+        strategy:              { type: string, enum: [sticky, round_robin, failover] }
+        cache_enabled:         { type: boolean }
+        cache_ttl_seconds:     { type: integer }
+        queue_timeout_seconds: { type: integer }
+        created_at:            { type: string, format: date-time }
+        updated_at:            { type: string, format: date-time }
+
+    RouterInput:
+      type: object
+      required: [name]
+      properties:
+        name:                  { type: string }
+        strategy:              { type: string, enum: [sticky, round_robin, failover], default: sticky }
+        cache_enabled:         { type: boolean, default: false }
+        cache_ttl_seconds:     { type: integer, default: 3600 }
+        queue_timeout_seconds: { type: integer, default: 60 }
+
+    RouterMember:
+      type: object
+      properties:
+        id:           { type: integer }
+        router_id:    { type: integer }
+        model_map_id: { type: integer }
+        priority:     { type: integer }
+
+    MCPServer:
+      type: object
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        url:         { type: string }
+        transport:   { type: string, enum: [http, stdio] }
+        api_key:     { type: string }
+        description: { type: string }
+        is_enabled:  { type: boolean }
+        created_at:  { type: string, format: date-time }
+        updated_at:  { type: string, format: date-time }
+
+    User:
+      type: object
+      properties:
+        id:         { type: integer }
+        name:       { type: string }
+        email:      { type: string, format: email }
+        is_active:  { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    UserWithStats:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            key_count:      { type: integer }
+            total_requests: { type: integer }
+
+    RequestLog:
+      type: object
+      properties:
+        id:              { type: integer }
+        api_key_id:      { type: integer, nullable: true }
+        backend_id:      { type: integer, nullable: true }
+        model:           { type: string }
+        endpoint:        { type: string }
+        request_tokens:  { type: integer }
+        response_tokens: { type: integer }
+        thinking_tokens: { type: integer }
+        total_tokens:    { type: integer }
+        cost:            { type: number }
+        status_code:     { type: integer }
+        latency_ms:      { type: integer }
+        error_message:   { type: string }
+        created_at:      { type: string, format: date-time }
+
+    DashboardStats:
+      type: object
+      description: Aggregated usage statistics across all backends and API keys
+      properties:
+        total_requests:     { type: integer }
+        total_tokens:       { type: integer }
+        total_cost:         { type: number }
+        error_rate:         { type: number }
+        avg_latency_ms:     { type: number }
+        requests_today:     { type: integer }
+        backends:           { type: array, items: { type: object } }
+        api_keys:           { type: array, items: { type: object } }
+        models:             { type: array, items: { type: object } }
+
+    AnalyticsCell:
+      type: object
+      description: Aggregated usage for a single (bucket, group) pair
+      properties:
+        requests: { type: integer }
+        tokens:   { type: integer }
+        cost:     { type: number }
+        errors:   { type: integer }
+
+    AnalyticsGroup:
+      type: object
+      description: Total usage for a single group across the whole range
+      properties:
+        key:      { type: string, description: Stable identifier (model name, or numeric id) }
+        label:    { type: string, description: Human-readable display name }
+        requests: { type: integer }
+        tokens:   { type: integer }
+        cost:     { type: number }
+        errors:   { type: integer }
+
+    AnalyticsResult:
+      type: object
+      description: Time-bucketed usage aggregated by a grouping dimension
+      properties:
+        group_by: { type: string, enum: [model, api_key, user, backend] }
+        interval: { type: string, enum: [hour, day, week] }
+        start:    { type: string, format: date-time }
+        end:      { type: string, format: date-time }
+        summary:  { $ref: '#/components/schemas/AnalyticsCell' }
+        groups:
+          type: array
+          description: Top groups (long tail collapsed into key "__other__"), ranked by usage
+          items: { $ref: '#/components/schemas/AnalyticsGroup' }
+        buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              time: { type: string, format: date-time }
+              groups:
+                type: object
+                additionalProperties: { $ref: '#/components/schemas/AnalyticsCell' }
+
+    QueueEntry:
+      type: object
+      description: Snapshot of an in-flight proxied request
+      properties:
+        id:         { type: string }
+        model:      { type: string }
+        backend_id: { type: integer }
+        started_at: { type: string, format: date-time }
+
+    ReadinessResponse:
+      type: object
+      properties:
+        ready:
+          type: boolean
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              ok:      { type: boolean }
+              message: { type: string }
+
+    JSONRPCMessage:
+      type: object
+      description: JSON-RPC 2.0 message used by the MCP Streamable HTTP endpoint.
+      additionalProperties: true
+      properties:
+        jsonrpc: { type: string, example: "2.0" }
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+            - type: "null"
+        method: { type: string, example: tools/list }
+        params: { type: object, additionalProperties: true }
+        result: { type: object, additionalProperties: true }
+        error:  { type: object, additionalProperties: true }
+
+    # ── OpenAI-compatible types ────────────────────────────────────────────
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant, tool]
+        content:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: object
+                description: Content parts (text, image_url, etc.)
+        name:         { type: string }
+        tool_calls:   { type: array, items: { type: object } }
+        tool_call_id: { type: string }
+
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model:
+          type: string
+          description: Model name as registered in model mappings
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/ChatMessage' }
+        stream:          { type: boolean, default: false }
+        temperature:     { type: number, minimum: 0, maximum: 2 }
+        top_p:           { type: number }
+        max_tokens:      { type: integer }
+        stop:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        presence_penalty:  { type: number }
+        frequency_penalty: { type: number }
+        n:                 { type: integer, default: 1 }
+        tools:             { type: array, items: { type: object } }
+        tool_choice:
+          oneOf:
+            - type: string
+            - type: object
+
+    EmbeddingRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model: { type: string }
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        encoding_format: { type: string, enum: [float, base64], default: float }
+
+    RerankRequest:
+      type: object
+      required: [model, query, documents]
+      properties:
+        model:      { type: string }
+        query:      { type: string }
+        documents:  { type: array, items: { type: string } }
+        top_n:      { type: integer }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+paths:
+  # ── System ─────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      summary: Liveness check
+      description: Returns 200 with body "ok" when the server process is running.
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            text/plain:
+              schema: { type: string, example: ok }
+
+  /ready:
+    get:
+      summary: Readiness check
+      description: |
+        Returns 200 when the server is ready to serve traffic (database connected,
+        models available if `RELAI_READY_REQUIRE_MODELS=true`).
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessResponse' }
+        "503":
+          description: Not ready — one or more checks failed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReadinessResponse' }
+
+  /api/openapi.yaml:
+    get:
+      summary: OpenAPI specification
+      description: This specification in YAML format. No authentication required.
+      security: []
+      tags: [System]
+      responses:
+        "200":
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema: { type: string }
+
+  /mcp:
+    post:
+      summary: MCP Streamable HTTP gateway
+      description: |
+        Accepts standard MCP JSON-RPC requests over Streamable HTTP and exposes
+        all enabled HTTP MCP servers registered in Relai as a single MCP server.
+        Tool and prompt names are prefixed as `<server>_<id>__<name>` to avoid
+        collisions. Resource URIs are wrapped with `relai+mcp://...` so reads
+        route back to the originating upstream server.
+      tags: [MCP Servers]
+      parameters:
+        - name: MCP-Protocol-Version
+          in: header
+          required: false
+          schema: { type: string, example: "2025-11-25" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JSONRPCMessage' }
+      responses:
+        "200":
+          description: JSON-RPC response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JSONRPCMessage' }
+        "202":
+          description: Notification accepted
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { description: Invalid Origin header }
+    get:
+      summary: MCP GET stream
+      description: Relai does not expose an independent server-to-client SSE stream.
+      tags: [MCP Servers]
+      responses:
+        "405": { description: GET streams are not supported }
+
+  # ── Auth ───────────────────────────────────────────────────────────────────
+
+  /api/auth/login:
+    post:
+      summary: Log in (admin)
+      description: Authenticate with username/password and receive a session cookie.
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: admin }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Login successful; `relai_session` cookie set
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429":
+          description: Too many failed attempts
+
+  /api/auth/logout:
+    post:
+      summary: Log out
+      tags: [Auth]
+      responses:
+        "200": { description: Logged out }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/auth/me:
+    get:
+      summary: Current authenticated user
+      tags: [Auth]
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/settings/branding:
+    get:
+      summary: Get branding settings
+      description: Public endpoint — no authentication required.
+      security: []
+      tags: [Settings]
+      responses:
+        "200":
+          description: Branding configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:        { type: string }
+                  logo_url:    { type: string }
+                  primary_color: { type: string }
+    put:
+      summary: Update branding settings
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:          { type: string }
+                logo_url:      { type: string }
+                primary_color: { type: string }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/settings/storage:
+    get:
+      summary: Storage diagnostics
+      tags: [Settings]
+      responses:
+        "200":
+          description: Storage stats (DB sizes, row counts, etc.)
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── OpenAI-compatible inference ────────────────────────────────────────────
+
+  /v1/chat/completions:
+    post:
+      summary: Chat completions
+      description: |
+        OpenAI-compatible chat completion endpoint. Relai proxies the request
+        to the selected backend after applying routing rules and model mappings.
+        Set `stream: true` for Server-Sent Events streaming.
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatCompletionRequest' }
+      responses:
+        "200":
+          description: |
+            Chat completion result. When `stream: true`, the response body is an
+            SSE stream of `data: {...}` lines ending with `data: [DONE]`.
+          content:
+            application/json:
+              schema: { type: object, description: "OpenAI ChatCompletion object" }
+            text/event-stream:
+              schema: { type: string, description: "SSE stream of ChatCompletionChunk objects" }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429":
+          description: Rate limit exceeded
+
+  /v1/completions:
+    post:
+      summary: Text completions (legacy)
+      description: Legacy completion endpoint, proxied to the backend unchanged.
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Completion result
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/embeddings:
+    post:
+      summary: Generate embeddings
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmbeddingRequest' }
+      responses:
+        "200":
+          description: Embedding vectors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, example: list }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        object:    { type: string, example: embedding }
+                        index:     { type: integer }
+                        embedding: { type: array, items: { type: number } }
+                  model: { type: string }
+                  usage: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v2/embed:
+    post:
+      summary: Generate embeddings (v2 alias)
+      description: Same as POST /v1/embeddings.
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmbeddingRequest' }
+      responses:
+        "200":
+          description: Embedding vectors
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/rerank:
+    post:
+      summary: Rerank documents
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RerankRequest' }
+      responses:
+        "200":
+          description: Reranking scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:           { type: integer }
+                        relevance_score: { type: number }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v2/rerank:
+    post:
+      summary: Rerank documents (v2 alias)
+      description: Same as POST /v1/rerank.
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RerankRequest' }
+      responses:
+        "200":
+          description: Reranking scores
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/models:
+    get:
+      summary: List available models
+      description: Returns models derived from active model mappings.
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      responses:
+        "200":
+          description: Model list (OpenAI format)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, example: list }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:         { type: string }
+                        object:     { type: string, example: model }
+                        created:    { type: integer }
+                        owned_by:   { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/models/{model}:
+    parameters:
+      - name: model
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Get model details
+      security:
+        - BearerAuth: []
+      tags: [Inference]
+      responses:
+        "200":
+          description: Model object
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ── Dashboard ──────────────────────────────────────────────────────────────
+
+  /api/dashboard/stats:
+    get:
+      summary: Aggregated usage statistics
+      tags: [Dashboard]
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardStats' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/dashboard/stream:
+    get:
+      summary: Live stat delta stream (SSE)
+      description: |
+        Server-Sent Events stream of request completion events. Each event carries
+        delta statistics suitable for updating a live dashboard.
+        Query `?errors=true` to receive only error events.
+      tags: [Dashboard]
+      parameters:
+        - name: errors
+          in: query
+          schema: { type: boolean, default: false }
+          description: If true, only error events are streamed
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/analytics/usage:
+    get:
+      summary: Time-bucketed usage analytics
+      description: |
+        Aggregates request logs into time buckets over a date range, grouped by a
+        chosen dimension. Powers the Analytics screen's stacked bar chart and
+        drill-down table. Labels for keys, users, and hosts are resolved from the
+        app database, so this works whether request logs are stored in SQLite or
+        PostgreSQL.
+      tags: [Dashboard]
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+          description: RFC3339 start of the range (defaults to 7 days ago)
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+          description: RFC3339 end of the range (defaults to now)
+        - name: group_by
+          in: query
+          schema: { type: string, enum: [model, api_key, user, backend], default: model }
+          description: Dimension to group (stack) usage by
+        - name: interval
+          in: query
+          schema: { type: string, enum: [hour, day, week] }
+          description: Bucket size. Omit to auto-select from the range span.
+      responses:
+        "200":
+          description: Aggregated usage analytics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnalyticsResult' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/queue:
+    get:
+      summary: In-flight request queue snapshot
+      description: Returns metadata (no bodies) about requests currently being proxied.
+      tags: [Dashboard]
+      responses:
+        "200":
+          description: Queue snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active:
+                    type: array
+                    items: { $ref: '#/components/schemas/QueueEntry' }
+                  count: { type: integer }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Backends ───────────────────────────────────────────────────────────────
+
+  /api/backends:
+    get:
+      summary: List backends
+      tags: [Backends]
+      responses:
+        "200":
+          description: All backends
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Backend' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create backend
+      tags: [Backends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BackendInput' }
+      responses:
+        "201":
+          description: Created backend
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backend' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/backends/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get backend
+      tags: [Backends]
+      responses:
+        "200":
+          description: Backend
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backend' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update backend
+      tags: [Backends]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BackendInput' }
+      responses:
+        "200":
+          description: Updated backend
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backend' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete backend
+      tags: [Backends]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/backends/{id}/health:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      summary: Run health check on backend
+      description: Probes `/v1/models` on the backend and updates its status.
+      tags: [Backends]
+      responses:
+        "200":
+          description: Updated backend with new health status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Backend' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "502":
+          description: Backend unreachable
+
+  # ── API Keys ───────────────────────────────────────────────────────────────
+
+  /api/keys:
+    get:
+      summary: List API keys
+      tags: [API Keys]
+      responses:
+        "200":
+          description: All API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/APIKey' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create API key
+      description: |
+        Creates a new inference or admin API key. The full key value (`plain_key`)
+        is returned **only once** — store it securely.
+      tags: [API Keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/APIKeyInput' }
+      responses:
+        "201":
+          description: Created key (includes one-time `plain_key`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:       { $ref: '#/components/schemas/APIKey' }
+                  plain_key: { type: string, example: "rlai_a1b2c3..." }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/keys/test:
+    post:
+      summary: Create temporary test key
+      description: |
+        Creates a short-lived (2-hour) test key for use in development/debugging.
+        Expired test keys are cleaned up automatically every 2 hours.
+      tags: [API Keys]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner: { type: string, default: admin }
+      responses:
+        "201":
+          description: Test key (includes one-time `plain_key`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:       { $ref: '#/components/schemas/APIKey' }
+                  plain_key: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/keys/cleanup:
+    post:
+      summary: Clean up expired test keys
+      tags: [API Keys]
+      responses:
+        "200":
+          description: Number of keys deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: integer }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/keys/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get API key
+      tags: [API Keys]
+      responses:
+        "200":
+          description: API key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/APIKey' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update API key
+      tags: [API Keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/APIKeyInput' }
+      responses:
+        "200":
+          description: Updated key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/APIKey' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete API key
+      tags: [API Keys]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Routing Rules ──────────────────────────────────────────────────────────
+
+  /api/routing-rules:
+    get:
+      summary: List routing rules
+      tags: [Routing]
+      responses:
+        "200":
+          description: All routing rules, ordered by priority (descending)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoutingRule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create routing rule
+      tags: [Routing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutingRuleInput' }
+      responses:
+        "201":
+          description: Created rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingRule' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/routing-rules/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get routing rule
+      tags: [Routing]
+      responses:
+        "200":
+          description: Routing rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingRule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update routing rule
+      tags: [Routing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutingRuleInput' }
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutingRule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete routing rule
+      tags: [Routing]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Model Mappings ─────────────────────────────────────────────────────────
+
+  /api/model-mappings:
+    get:
+      summary: List model mappings
+      tags: [Model Mappings]
+      responses:
+        "200":
+          description: All model mappings
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ModelMap' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create model mapping
+      description: |
+        Maps a `local_model` name (what clients send) to a `remote_model` name
+        on a specific backend.
+      tags: [Model Mappings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backend_id, remote_model, local_model]
+              properties:
+                backend_id:              { type: integer }
+                remote_model:            { type: string }
+                local_model:             { type: string }
+                model_type:              { type: string, enum: [chat, embedding, rerank] }
+                input_cost_per_million:  { type: number, default: 0 }
+                output_cost_per_million: { type: number, default: 0 }
+                status:                  { type: string, enum: [active, inactive] }
+      responses:
+        "201":
+          description: Created mapping
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelMap' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/model-mappings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get model mapping
+      tags: [Model Mappings]
+      responses:
+        "200":
+          description: Model mapping
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelMap' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update model mapping
+      tags: [Model Mappings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Updated mapping
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelMap' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete model mapping
+      tags: [Model Mappings]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/model-mappings/{id}/health:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      summary: Health check model mapping
+      tags: [Model Mappings]
+      responses:
+        "200":
+          description: Health check result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelMap' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Virtual Routers ────────────────────────────────────────────────────────
+
+  /api/routers:
+    get:
+      summary: List virtual routers
+      description: |
+        Virtual routers provide named, addressable model endpoints. Clients
+        address them by the router name as the model (e.g. `model: "gpt4-router"`).
+      tags: [Virtual Routers]
+      responses:
+        "200":
+          description: All virtual routers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Router' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create virtual router
+      tags: [Virtual Routers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouterInput' }
+      responses:
+        "201":
+          description: Created router
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Router' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/routers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get virtual router
+      tags: [Virtual Routers]
+      responses:
+        "200":
+          description: Virtual router
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Router' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update virtual router
+      tags: [Virtual Routers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouterInput' }
+      responses:
+        "200":
+          description: Updated router
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Router' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete virtual router
+      tags: [Virtual Routers]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/routers/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: List router members (model mappings)
+      tags: [Virtual Routers]
+      responses:
+        "200":
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RouterMember' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Add member to router
+      tags: [Virtual Routers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model_map_id]
+              properties:
+                model_map_id: { type: integer }
+                priority:     { type: integer, default: 0 }
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RouterMember' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/routers/{id}/members/{memberID}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: memberID
+        in: path
+        required: true
+        schema: { type: integer }
+    delete:
+      summary: Remove member from router
+      tags: [Virtual Routers]
+      responses:
+        "200": { description: Removed }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/routers/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get virtual router status
+      description: Reports health status of all member model mappings.
+      tags: [Virtual Routers]
+      responses:
+        "200":
+          description: Router status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  router:  { $ref: '#/components/schemas/Router' }
+                  members: { type: array, items: { type: object } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── MCP Servers ────────────────────────────────────────────────────────────
+
+  /api/mcp-servers:
+    get:
+      summary: List MCP servers
+      tags: [MCP Servers]
+      responses:
+        "200":
+          description: All MCP servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MCPServer' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Register MCP server
+      tags: [MCP Servers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name:        { type: string }
+                url:         { type: string }
+                transport:   { type: string, enum: [http, stdio], default: http }
+                api_key:     { type: string }
+                description: { type: string }
+                is_enabled:  { type: boolean, default: true }
+      responses:
+        "201":
+          description: Registered MCP server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MCPServer' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/mcp-servers/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get MCP server
+      tags: [MCP Servers]
+      responses:
+        "200":
+          description: MCP server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MCPServer' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update MCP server
+      tags: [MCP Servers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MCPServer' }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MCPServer' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete MCP server
+      tags: [MCP Servers]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Users ──────────────────────────────────────────────────────────────────
+
+  /api/users:
+    get:
+      summary: List users
+      tags: [Users]
+      responses:
+        "200":
+          description: All users with aggregate stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserWithStats' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:      { type: string }
+                email:     { type: string, format: email }
+                is_active: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: Get user
+      tags: [Users]
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      summary: Update user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:      { type: string }
+                email:     { type: string, format: email }
+                is_active: { type: boolean }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      summary: Delete user
+      tags: [Users]
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/users/{id}/keys:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      summary: List API keys for user
+      tags: [Users]
+      responses:
+        "200":
+          description: User's API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/APIKey' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+    post:
+      summary: Create API key for user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/APIKeyInput' }
+      responses:
+        "201":
+          description: Created key (includes one-time `plain_key`)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:       { $ref: '#/components/schemas/APIKey' }
+                  plain_key: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Logs ───────────────────────────────────────────────────────────────────
+
+  /api/logs:
+    get:
+      summary: List request logs
+      tags: [Logs]
+      parameters:
+        - name: model
+          in: query
+          schema: { type: string }
+        - name: backend_id
+          in: query
+          schema: { type: integer }
+        - name: api_key_id
+          in: query
+          schema: { type: integer }
+        - name: errors_only
+          in: query
+          schema: { type: boolean }
+        - name: from
+          in: query
+          description: RFC3339 start time
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: RFC3339 end time
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100, maximum: 1000 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: Request logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/RequestLog' }
+                  total: { type: integer }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Events ─────────────────────────────────────────────────────────────────
+
+  /api/events:
+    get:
+      summary: System event log
+      tags: [Events]
+      responses:
+        "200":
+          description: Recent system events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:         { type: integer }
+                        level:      { type: string }
+                        event_type: { type: string }
+                        message:    { type: string }
+                        metadata:   { type: object }
+                        created_at: { type: string, format: date-time }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Config import/export ───────────────────────────────────────────────────
+
+  /api/config/export:
+    get:
+      summary: Export full configuration
+      description: Exports backends, model mappings, routing rules, and routers as JSON.
+      tags: [Config]
+      responses:
+        "200":
+          description: Configuration snapshot
+          content:
+            application/json:
+              schema: { type: object }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/config/import:
+    post:
+      summary: Import configuration
+      description: |
+        Imports a previously exported configuration. Existing resources with matching
+        names are updated; new ones are created. API keys and logs are not imported.
+      tags: [Config]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Import summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported: { type: integer }
+                  updated:  { type: integer }
+                  errors:   { type: array, items: { type: string } }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ── Metrics ────────────────────────────────────────────────────────────────
+
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      description: Exposes request count, token counts, latency histograms, and backend health.
+      tags: [System]
+      responses:
+        "200":
+          description: Prometheus text format
+          content:
+            text/plain:
+              schema: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+security:
+  - BearerAuth: []
+  - AdminCookieAuth: []
+
+tags:
+  - name: System
+    description: Health, readiness, and meta endpoints
+  - name: Auth
+    description: Admin session management
+  - name: Inference
+    description: OpenAI-compatible LLM proxy endpoints
+  - name: Dashboard
+    description: Usage statistics and live request stream
+  - name: Backends
+    description: LLM backend registration and health
+  - name: API Keys
+    description: API key lifecycle management
+  - name: Routing
+    description: Request routing rules
+  - name: Model Mappings
+    description: Local-to-remote model name mappings
+  - name: Virtual Routers
+    description: Named virtual model endpoints with failover/load-balancing
+  - name: MCP Servers
+    description: Model Context Protocol server registry
+  - name: Users
+    description: User management and per-user API keys
+  - name: Logs
+    description: Request log access
+  - name: Events
+    description: System event log
+  - name: Config
+    description: Configuration export and import
+  - name: Settings
+    description: Branding and storage settings

@@ -1,0 +1,36 @@
+# Binaries
+/relai
+/relai.exe
+
+# Dependencies
+vendor/
+
+# Database
+relai.db
+relai.db-wal
+relai.db-shm
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+internal/server/frontend/dist/
+
+# Tests
+testbinary/
+
+# Logs
+*.log
+
+# Environment
+.env
+bin/
