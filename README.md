@@ -17,7 +17,12 @@ dependencies.
   - **cache-aware sticky** — session affinity plus first placement on a backend
     with observed KV-pool headroom (polls Halogen-compatible `/cache`)
   - **cost-aware spill** — a warm-but-busy session spills to an idle sibling when
-    the estimated re-prefill is cheaper than queueing
+    the estimated re-prefill is cheaper than queueing, priced at each host's
+    *measured* prefill speed rather than a static assumption
+  - **shared-prefix placement** — the router remembers which host last processed
+    a shared prompt prefix (system prompt + tool definitions), so a fleet of
+    sub-agents opening with the same 10–30k-token preamble lands on the host
+    that already has it cached instead of re-prefilling everywhere
 - **Interactive request priority** — mark latency-critical API keys (voice
   assistants, chat UIs) so their requests carry `X-Halogen-Priority` and claim
   reserved engine slots instead of queueing behind bulk agent work. Client
@@ -28,7 +33,8 @@ dependencies.
 - **Engine + router queue visibility** — relai's admission queue and the
   engine-side queue (`queued`, `longest_wait_s`) side by side in the admin UI.
 - **Prefix-cache analytics** — why tokens get reprocessed (mutated system
-  prompts, evictions, new conversations), attributed per API key.
+  prompts, changed tool definitions, evictions, new conversations), attributed
+  per API key.
 - **Throughput analytics** — prefill/decode tok/s per host and per bucket,
   token-weighted, with wall-clock aggregates.
 - **API key management** — scopes, rate limits, per-key cost attribution,
@@ -36,8 +42,9 @@ dependencies.
 - **Request logging** — every request with token counts, cached tokens, cost,
   latency, wait, prefill/decode split, routing decision, and a per-request
   trace ID in error bodies.
-- **Web dashboard** — backends, routers, keys, live queue view, logs, analytics,
-  throughput charts, cache telemetry cards.
+- **Web dashboard** — a console-style UI: overview, usage, and performance
+  pages, backends, routers, keys, live queue view, request logs, throughput
+  charts, and cache telemetry cards.
 - **MCP endpoints** — expose configured backends over the Model Context
   Protocol.
 
