@@ -43,21 +43,21 @@ function UserForm({ initial, onSubmit, onClose }: {
       <div>
         <label className="block text-sm text-slate-400 mb-1">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Email</label>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <label className="flex items-center gap-2 cursor-pointer select-none">
         <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)}
-          className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800" />
+          className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800" />
         <span className="text-sm text-slate-300">Active</span>
       </label>
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+        <button type="submit" className="btn-primary">
           {initial ? 'Save changes' : 'Create user'}
         </button>
       </div>
@@ -94,17 +94,17 @@ function UserKeyForm({ backends, onSubmit, onClose }: {
       <div>
         <label className="block text-xs text-slate-400 mb-1">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-xs text-slate-400 mb-1">Rate limit <span className="text-slate-500">(req/min)</span></label>
         <input type="number" value={rateLimit} onChange={e => setRateLimit(Number(e.target.value))} min={1}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-xs text-slate-400 mb-1">Expires <span className="text-slate-500">(optional)</span></label>
         <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-xs text-slate-400 mb-1">Scopes</label>
@@ -114,7 +114,7 @@ function UserKeyForm({ backends, onSubmit, onClose }: {
               <input type="checkbox"
                 checked={scopes.includes(scope.value)}
                 onChange={() => toggleScope(scope.value)}
-                className="rounded border-slate-500 bg-slate-600 text-blue-500" />
+                className="rounded border-slate-500 bg-slate-600 text-accent-500" />
               {scope.label}
             </label>
           ))}
@@ -134,7 +134,7 @@ function UserKeyForm({ backends, onSubmit, onClose }: {
                   checked={allowedBackends.includes(b.id)}
                   onChange={() => setAllowedBackends(prev =>
                     prev.includes(b.id) ? prev.filter(x => x !== b.id) : [...prev, b.id])}
-                  className="rounded border-slate-500 bg-slate-600 text-blue-500" />
+                  className="rounded border-slate-500 bg-slate-600 text-accent-500" />
                 {b.name}
               </label>
             ))}
@@ -143,7 +143,7 @@ function UserKeyForm({ backends, onSubmit, onClose }: {
       )}
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-3 py-1.5 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">Create key</button>
+        <button type="submit" className="px-3 py-1.5 bg-accent-500 hover:bg-accent-400 text-slate-950 font-medium rounded-lg text-sm">Create key</button>
       </div>
     </form>
   )
@@ -155,10 +155,10 @@ function NewKeyBanner({ value, onDismiss }: { value: string; onDismiss: () => vo
   const { toast } = useToast()
   const copy = () => { navigator.clipboard.writeText(value); toast('Copied', 'success') }
   return (
-    <div className="mt-3 p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
-      <p className="text-xs text-green-400 mb-1.5 font-medium">Key created — save it now, it won't be shown again.</p>
+    <div className="mt-3 p-3 bg-good-900/30 border border-good-700/50 rounded-lg">
+      <p className="text-xs text-good-400 mb-1.5 font-medium">Key created — save it now, it won't be shown again.</p>
       <div className="flex items-center gap-2">
-        <code className="flex-1 px-2 py-1 bg-slate-900 rounded text-xs font-mono text-green-300 truncate">{value}</code>
+        <code className="flex-1 px-2 py-1 bg-slate-900 rounded text-xs font-mono text-good-300 truncate">{value}</code>
         <button onClick={copy} className="p-1.5 text-slate-400 hover:text-white" title="Copy"><Copy className="w-3.5 h-3.5" /></button>
         <button onClick={onDismiss} className="text-xs text-slate-500 hover:text-white px-1">Dismiss</button>
       </div>
@@ -213,7 +213,7 @@ function UserKeys({ user }: { user: UserWithStats }) {
         )}
 
         {keys.length > 0 && (
-          <table className="w-full text-sm mb-2">
+          <table className="table-pro mb-2">
             <thead>
               <tr>
                 <th className="text-left py-1.5 pr-4 text-slate-500 text-xs font-medium">Name</th>
@@ -236,7 +236,7 @@ function UserKeys({ user }: { user: UserWithStats }) {
                   </td>
                   <td className="py-2">
                     <span className={`inline-flex px-1.5 py-0.5 rounded text-xs ${
-                      k.is_active ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'
+                      k.is_active ? 'bg-good-500/20 text-good-400' : 'bg-slate-500/20 text-slate-400'
                     }`}>{k.is_active ? 'active' : 'inactive'}</span>
                   </td>
                 </tr>
@@ -288,7 +288,7 @@ function UserRow({ user, onEdit, onDelete }: {
         <td className="px-4 py-4 text-slate-400 text-sm">${user.total_cost.toFixed(4)}</td>
         <td className="px-4 py-4">
           <span className={`inline-flex px-2 py-1 rounded-full text-xs ${
-            user.is_active ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'
+            user.is_active ? 'bg-good-500/20 text-good-400' : 'bg-slate-500/20 text-slate-400'
           }`}>
             {user.is_active ? 'Active' : 'Inactive'}
           </span>
@@ -298,7 +298,7 @@ function UserRow({ user, onEdit, onDelete }: {
             <button onClick={onEdit} className="p-1.5 text-slate-400 hover:text-white rounded">
               <Pencil className="w-4 h-4" />
             </button>
-            <button onClick={onDelete} className="p-1.5 text-slate-400 hover:text-red-400 rounded">
+            <button onClick={onDelete} className="p-1.5 text-slate-400 hover:text-crit-400 rounded">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -320,12 +320,12 @@ function UserRow({ user, onEdit, onDelete }: {
 function TabBar({ active, onChange }: { active: string; onChange: (t: string) => void }) {
   const tabs = [{ id: 'users', label: 'Users' }, { id: 'apikeys', label: 'API Keys' }]
   return (
-    <div className="flex gap-0 border-b border-slate-700 mb-6">
+    <div className="flex gap-0 border-b border-slate-700 mb-4">
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange(t.id)}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+          className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
             active === t.id
-              ? 'border-blue-400 text-blue-400'
+              ? 'border-accent-500 text-slate-50'
               : 'border-transparent text-slate-400 hover:text-white'
           }`}>
           {t.label}
@@ -387,14 +387,14 @@ export default function Users() {
       <TabBar active={tab} onChange={t => setTab(t as 'users' | 'apikeys')} />
       {tab === 'apikeys' ? <APIKeys /> : null}
       {tab === 'users' && <>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">Users</h2>
-          <p className="text-slate-400 text-sm mt-1">Users own API keys. Usage is tracked per-key and rolled up here.</p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">Users</h1>
+          <p className="page-description">Users own API keys. Usage is tracked per-key and rolled up here.</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm"
+          className="btn-primary"
         >
           <Plus className="w-4 h-4" /> New user
         </button>
@@ -402,30 +402,30 @@ export default function Users() {
 
       {/* Summary strip */}
       {users.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="kpi-strip mb-3 grid-cols-3">
           {[
             { label: 'Users', value: String(users.length) },
             { label: 'Total requests', value: totalRequests.toLocaleString() },
             { label: 'Total cost', value: `$${totalCost.toFixed(4)}` },
           ].map(s => (
-            <div key={s.label} className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-              <p className="text-xs text-slate-400">{s.label}</p>
-              <p className="text-xl font-bold mt-0.5">{s.value}</p>
+            <div key={s.label} className="panel px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</p>
+              <p className="mt-1 font-mono text-xl font-medium tabular">{s.value}</p>
             </div>
           ))}
         </div>
       )}
 
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+            <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
           </div>
         ) : users.length === 0 ? (
           <EmptyState icon={UsersIcon} message="No users yet" hint="Create a user to start tracking usage per person." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
+            <table className="table-pro min-w-[700px]">
               <thead>
                 <tr className="border-b border-slate-700">
                   <th className="w-8 px-3 py-3" />

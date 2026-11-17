@@ -53,6 +53,11 @@ type AnalyticsOptions struct {
 
 // otherGroupKey collects groups beyond the top maxAnalyticsGroups so stacked
 // charts stay readable while totals remain accurate.
+// analyticsSlotSeconds is the granularity the log store pre-aggregates to. Every
+// real time zone's offset is a multiple of 15 minutes, so 15-minute UTC slots
+// still fall cleanly into local hours, days and weeks.
+const analyticsSlotSeconds = 15 * 60
+
 const (
 	otherGroupKey       = "__other__"
 	maxAnalyticsGroups  = 15
@@ -60,10 +65,12 @@ const (
 )
 
 // UsageAnalytics aggregates request_logs into time buckets grouped by the
-// requested dimension. It is dialect-agnostic: rows are pulled from the log
-// store (SQLite or Postgres) and bucketed in Go, while human-readable labels
-// for keys/users/backends are resolved from the app SQLite DB. This is the one
-// code path that works whether or not Postgres log storage is enabled.
+// requested dimension. The log store (SQLite or Postgres) pre-aggregates into
+// fixed UTC slots (see analyticsSlotSeconds) so a long range returns a few
+// thousand rows rather than every request; the slots are then bucketed into
+// local hours/days/weeks in Go, and human-readable labels for keys/users/
+// backends are resolved from the app SQLite DB. This is the one code path that
+// works whether or not Postgres log storage is enabled.
 func (d *DB) UsageAnalytics(opts AnalyticsOptions) (*AnalyticsResult, error) {
 	switch opts.GroupBy {
 	case "model", "api_key", "user", "backend":
@@ -103,13 +110,16 @@ func (d *DB) UsageAnalytics(opts AnalyticsOptions) (*AnalyticsResult, error) {
 		return nil, err
 	}
 
-	// Pull the raw rows in range from the log store.
+	// Pre-aggregate in the log store: one row per (slot, key, host, model) rather
+	// than one per request.
 	logDB := d.Logs.db
 	rows, err := logDB.Query(`
-		SELECT created_at, api_key_id, backend_id, model, total_tokens, cost, status_code
+		SELECT `+d.Logs.slotExpr(analyticsSlotSeconds)+` AS slot, api_key_id, backend_id, model,
+			COUNT(*), COALESCE(SUM(total_tokens), 0), COALESCE(SUM(cost), 0),
+			COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0)
 		FROM request_logs
 		WHERE created_at >= `+d.Logs.placeholder(1)+` AND created_at < `+d.Logs.placeholder(2)+`
-		ORDER BY created_at ASC`,
+		GROUP BY slot, api_key_id, backend_id, model`,
 		d.Logs.timeParam(opts.Start), d.Logs.timeParam(opts.End))
 	if err != nil {
 		return nil, err
@@ -126,20 +136,21 @@ func (d *DB) UsageAnalytics(opts AnalyticsOptions) (*AnalyticsResult, error) {
 
 	for rows.Next() {
 		var (
-			createdAt time.Time
+			slot      int64
 			apiKeyID  *int64
 			backendID *int64
 			model     string
+			requests  int
 			tokens    int
 			cost      float64
-			status    int
+			errors    int
 		)
-		if err := rows.Scan(&createdAt, &apiKeyID, &backendID, &model, &tokens, &cost, &status); err != nil {
+		if err := rows.Scan(&slot, &apiKeyID, &backendID, &model, &requests, &tokens, &cost, &errors); err != nil {
 			return nil, err
 		}
 
 		key, label := analyticsGroupKey(opts.GroupBy, model, apiKeyID, backendID, keyNames, backendNames, userNames, keyToUser)
-		bucket := alignBucket(createdAt, interval, loc)
+		bucket := alignBucket(time.Unix(slot*analyticsSlotSeconds, 0), interval, loc)
 
 		ck := cellKey{bucket: bucket, group: key}
 		c := cells[ck]
@@ -153,21 +164,16 @@ func (d *DB) UsageAnalytics(opts AnalyticsOptions) (*AnalyticsResult, error) {
 			groupTotals[key] = gt
 		}
 
-		isErr := status >= 400
-		c.Requests++
-		c.Tokens += tokens
-		c.Cost += cost
-		gt.Requests++
+		for _, cell := range []*AnalyticsCell{c, &summary} {
+			cell.Requests += requests
+			cell.Tokens += tokens
+			cell.Cost += cost
+			cell.Errors += errors
+		}
+		gt.Requests += requests
 		gt.Tokens += tokens
 		gt.Cost += cost
-		summary.Requests++
-		summary.Tokens += tokens
-		summary.Cost += cost
-		if isErr {
-			c.Errors++
-			gt.Errors++
-			summary.Errors++
-		}
+		gt.Errors += errors
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

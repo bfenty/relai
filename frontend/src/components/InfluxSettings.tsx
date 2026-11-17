@@ -5,7 +5,7 @@ import { settingsApi } from '../api/client'
 import type { InfluxSettings as Settings } from '../types'
 
 const input =
-  'w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-accent-500'
 
 export default function InfluxSettings() {
   const qc = useQueryClient()
@@ -44,7 +44,7 @@ export default function InfluxSettings() {
     <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-6 space-y-4">
       <div>
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Database className="w-5 h-5 text-cyan-400" /> Metrics export (InfluxDB)
+          <Database className="w-5 h-5 text-slate-400" /> Metrics export (InfluxDB)
         </h3>
         <p className="text-sm text-slate-400 mt-1">
           Periodically writes routing health — cache reuse, cold arrivals, reprocessed tokens and
@@ -55,7 +55,7 @@ export default function InfluxSettings() {
 
       <label className="flex items-center gap-3 cursor-pointer">
         <button type="button" onClick={() => set('enabled', !form.enabled)}
-          className={`relative w-10 h-5 rounded-full transition-colors ${form.enabled ? 'bg-blue-600' : 'bg-slate-600'}`}>
+          className={`relative w-10 h-5 rounded-full transition-colors ${form.enabled ? 'bg-accent-500 text-slate-950' : 'bg-slate-600'}`}>
           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
         <span className="text-sm text-slate-300">Enable export</span>
@@ -102,8 +102,8 @@ export default function InfluxSettings() {
       {result && (
         <div className={`flex items-start gap-2 text-sm rounded-md p-3 border ${
           result.ok
-            ? 'bg-green-500/10 border-green-500/30 text-green-300'
-            : 'bg-red-500/10 border-red-500/30 text-red-300'
+            ? 'bg-good-500/10 border-good-500/30 text-good-300'
+            : 'bg-crit-500/10 border-crit-500/30 text-crit-300'
         }`}>
           {result.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
                      : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
@@ -113,7 +113,7 @@ export default function InfluxSettings() {
 
       <div className="flex gap-2">
         <button onClick={() => { setResult(null); save.mutate() }} disabled={save.isPending}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg text-white text-sm">
+          className="px-4 py-2 bg-accent-500 hover:bg-accent-400 text-slate-950 font-medium disabled:opacity-50 rounded-lg text-sm">
           {save.isPending ? 'Saving…' : 'Save'}
         </button>
         <button onClick={() => { setResult(null); test.mutate() }} disabled={test.isPending}

@@ -138,7 +138,7 @@ func (d *DB) RoutingAnalytics(from, to time.Time) (*RoutingStats, error) {
 		case "sticky_spill":
 			spilled += n
 			routed += n
-		case "fresh":
+		case "fresh", "prefix_home":
 			routed += n
 		}
 	}

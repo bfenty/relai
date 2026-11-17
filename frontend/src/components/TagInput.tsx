@@ -28,9 +28,9 @@ export function TagInput({ values, onChange, placeholder = 'Type and press Enter
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-700 border border-slate-600 rounded-lg min-h-[42px] focus-within:border-blue-500">
+    <div className="flex flex-wrap gap-1.5 p-2 bg-slate-700 border border-slate-600 rounded-lg min-h-[42px] focus-within:border-accent-500">
       {values.map(tag => (
-        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-600/30 text-blue-300 rounded text-sm font-mono">
+        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700 text-slate-200 rounded text-sm font-mono">
           {tag}
           <button type="button" onClick={() => remove(tag)} className="hover:text-white">
             <X className="w-3 h-3" />

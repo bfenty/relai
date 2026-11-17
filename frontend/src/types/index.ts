@@ -332,7 +332,7 @@ export interface RoutingStats {
 }
 
 export type PrefixCause =
-  | 'append' | 'system' | 'head' | 'tail' | 'truncated'
+  | 'append' | 'system' | 'tools' | 'head' | 'tail' | 'truncated'
   | 'host_change' | 'evicted' | 'new_conversation'
 
 export interface PrefixCauseStat {
@@ -370,6 +370,7 @@ export interface PrefixPoint {
   fault_requests: number
   append: number
   system: number
+  tools: number
   head: number
   tail: number
   truncated: number

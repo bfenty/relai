@@ -27,8 +27,8 @@ func DefaultBrandingSettings() BrandingSettings {
 	return BrandingSettings{
 		AppName:      "Relai",
 		LogoURL:      "",
-		PrimaryColor: "#2563eb",
-		AccentColor:  "#60a5fa",
+		PrimaryColor: "#fa7c20",
+		AccentColor:  "#ffa068",
 	}
 }
 

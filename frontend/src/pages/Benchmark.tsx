@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
+import { AXIS, GRID, tooltipStyle, sem } from '../theme'
 import { modelMappingsApi, routersApi, proxyChat } from '../api/client'
 import { ModelMap, Router } from '../types'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { useState, useRef } from 'react'
-import { Play, Square, Gauge } from 'lucide-react'
+import { Play, Square } from 'lucide-react'
 
 interface RunResult {
   latencyMs: number
@@ -67,7 +68,7 @@ function buildHistogram(results: RunResult[], buckets = 12) {
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 text-center">
+    <div className="panel p-4 text-center">
       <p className="text-xs text-slate-400 mb-1">{label}</p>
       <p className="text-xl font-bold text-white">{value}</p>
     </div>
@@ -145,23 +146,22 @@ export default function Benchmark() {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        <Gauge className="w-6 h-6 text-slate-400" />
-        <div>
-          <h2 className="text-2xl font-bold">Benchmark</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Measure latency and throughput for any model or router</p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">Benchmark</h1>
+          <p className="page-description">Measure latency and throughput for any model or router</p>
         </div>
       </div>
 
       {/* ── Config ── */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700 p-5 mb-5 space-y-4">
+      <div className="panel p-4 mb-3 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm text-slate-400 mb-1">Model / Router</label>
             <select
               value={model}
               onChange={e => setModel(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500"
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-accent-500"
             >
               <option value="">— select —</option>
               {models.length > 0 && (
@@ -182,7 +182,7 @@ export default function Benchmark() {
               <input
                 type="number" value={numRequests} min={1} max={200}
                 onChange={e => setNumRequests(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-accent-500"
               />
             </div>
             <div>
@@ -193,7 +193,7 @@ export default function Benchmark() {
               <input
                 type="range" value={concurrency} min={1} max={10}
                 onChange={e => setConcurrency(Number(e.target.value))}
-                className="w-full mt-2 accent-blue-500"
+                className="w-full mt-2 accent-accent-500"
               />
             </div>
           </div>
@@ -204,7 +204,7 @@ export default function Benchmark() {
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             rows={3}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100 resize-y focus:outline-none focus:border-blue-500"
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-100 resize-y focus:outline-none focus:border-accent-500"
           />
         </div>
 
@@ -212,12 +212,12 @@ export default function Benchmark() {
           {running ? (
             <>
               <button onClick={stop}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm">
+                className="flex items-center gap-2 px-4 py-2 bg-crit-600 hover:bg-crit-700 rounded-lg text-sm">
                 <Square className="w-4 h-4" /> Stop
               </button>
               <div className="flex-1 bg-slate-700 rounded-full h-2">
                 <div
-                  className="bg-blue-500 h-2 rounded-full transition-all"
+                  className="bg-accent-500 h-2 rounded-full transition-all"
                   style={{ width: `${Math.round(progress * 100)}%` }}
                 />
               </div>
@@ -227,7 +227,7 @@ export default function Benchmark() {
             </>
           ) : (
             <button onClick={run} disabled={!model}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-lg text-sm">
+              className="btn-primary">
               <Play className="w-4 h-4" /> Run
             </button>
           )}
@@ -249,19 +249,19 @@ export default function Benchmark() {
           </div>
 
           {hist.length > 0 && (
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-5">
+            <div className="panel p-4">
               <h3 className="text-sm font-semibold text-slate-300 mb-4">Latency distribution</h3>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={hist} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} />
+                    <CartesianGrid vertical={false} stroke={GRID} />
+                    <XAxis dataKey="label" {...AXIS} />
+                    <YAxis {...AXIS} allowDecimals={false} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '6px', fontSize: 12 }}
+                      {...tooltipStyle}
                       formatter={(v: number) => [v, 'requests']}
                     />
-                    <Bar dataKey="count" fill="#3b82f6" name="Requests" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="count" fill={sem.volume} name="Requests" radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -269,11 +269,11 @@ export default function Benchmark() {
           )}
 
           {stats.errors > 0 && (
-            <div className="mt-4 p-4 bg-red-900/20 border border-red-700/40 rounded-lg">
-              <p className="text-sm text-red-400">
+            <div className="mt-4 p-4 bg-crit-900/20 border border-crit-700/40 rounded-lg">
+              <p className="text-sm text-crit-400">
                 {stats.errors} of {stats.total} requests failed.
                 {results?.filter(r => r.error).slice(0, 3).map((r, i) => (
-                  <span key={i} className="block font-mono text-xs mt-1 text-red-300">{r.error}</span>
+                  <span key={i} className="block font-mono text-xs mt-1 text-crit-300">{r.error}</span>
                 ))}
               </p>
             </div>

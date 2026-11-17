@@ -32,10 +32,10 @@ function ThinkBlock({ content, streaming, tokenCount }: {
   }, [streaming])
 
   return (
-    <div className="mb-2 rounded-lg border border-purple-800/40 bg-purple-950/20 overflow-hidden text-xs">
+    <div className="mb-2 rounded-lg border border-output-800/40 bg-output-950/20 overflow-hidden text-xs">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-purple-300/70 hover:text-purple-200 text-left"
+        className="w-full flex items-center gap-2 px-3 py-2 text-output-300/70 hover:text-output-200 text-left"
       >
         {streaming
           ? <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
@@ -44,13 +44,13 @@ function ThinkBlock({ content, streaming, tokenCount }: {
         <span className="font-medium">
           {streaming ? 'Thinking…' : `Thought${tokenCount ? ` · ~${tokenCount} tokens` : ''}`}
         </span>
-        {streaming && <span className="inline-block w-0.5 h-3 bg-purple-300/50 animate-pulse" />}
+        {streaming && <span className="inline-block w-0.5 h-3 bg-output-300/50 animate-pulse" />}
         <span className="ml-auto opacity-60">{open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}</span>
       </button>
       {open && (
-        <div className="px-3 pb-3 pt-1 text-purple-200/55 italic leading-relaxed whitespace-pre-wrap border-t border-purple-800/30 font-mono max-h-56 overflow-y-auto">
+        <div className="px-3 pb-3 pt-1 text-output-200/55 italic leading-relaxed whitespace-pre-wrap border-t border-output-800/30 font-mono max-h-56 overflow-y-auto">
           {content}
-          {streaming && <span className="inline-block w-0.5 h-3 bg-purple-300/50 animate-pulse ml-0.5" />}
+          {streaming && <span className="inline-block w-0.5 h-3 bg-output-300/50 animate-pulse ml-0.5" />}
         </div>
       )}
     </div>
@@ -68,7 +68,7 @@ function ModelPicker({ value, onChange }: { value: string; onChange: (v: string)
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-blue-500 min-w-48"
+      className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-accent-500 min-w-48"
     >
       <option value="">— select model —</option>
       {models.length > 0 && (
@@ -93,7 +93,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mt-0.5 ${
-        isUser ? 'bg-blue-600' : 'bg-slate-700'
+        isUser ? 'bg-slate-600' : 'bg-slate-700'
       }`}>
         {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5 text-slate-300" />}
       </div>
@@ -112,9 +112,9 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         {(isUser || msg.thinkingDone !== false) && (
           <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
             isUser
-              ? 'bg-blue-600 text-white rounded-tr-sm'
+              ? 'bg-slate-700 text-slate-100 rounded-tr-sm'
               : msg.error
-                ? 'bg-red-900/40 text-red-300 border border-red-700/40 rounded-tl-sm'
+                ? 'bg-crit-900/40 text-crit-300 border border-crit-700/40 rounded-tl-sm'
                 : 'bg-slate-700 text-slate-100 rounded-tl-sm'
           }`}>
             {msg.content || (msg.streaming ? '' : '…')}
@@ -129,15 +129,15 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           <div className="flex flex-wrap gap-3 text-xs text-slate-500 px-1">
             {msg.latencyMs !== undefined && <span>{(msg.latencyMs / 1000).toFixed(1)}s</span>}
             {msg.thinkingTokens !== undefined && msg.thinkingTokens > 0 && (
-              <span className="text-purple-400/70">~{msg.thinkingTokens} think</span>
+              <span className="text-output-400/70">~{msg.thinkingTokens} think</span>
             )}
             {msg.tokens !== undefined && (
               <span>{msg.tokens} tok</span>
             )}
             {msg.tokens && msg.genMs
-              ? <span className="text-cyan-400/80">{((msg.tokens / msg.genMs) * 1000).toFixed(0)} tok/s</span>
+              ? <span className="text-output-300/80">{((msg.tokens / msg.genMs) * 1000).toFixed(0)} tok/s</span>
               : msg.tokens && msg.latencyMs
-              ? <span className="text-cyan-400/80">{((msg.tokens / msg.latencyMs) * 1000).toFixed(0)} tok/s</span>
+              ? <span className="text-output-300/80">{((msg.tokens / msg.latencyMs) * 1000).toFixed(0)} tok/s</span>
               : null}
           </div>
         )}
@@ -290,10 +290,10 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-2rem)] max-h-[900px]">
+    <div className="flex flex-col h-[calc(100vh-5rem)] max-h-[900px]">
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center gap-3 mb-3">
-        <h2 className="text-2xl font-bold">Chat</h2>
+        <h1 className="page-title">Chat</h1>
         <ModelPicker value={model} onChange={setModel} />
         <button
           onClick={() => setThinking(t => t === null ? true : t ? false : null)}
@@ -308,7 +308,7 @@ export default function Chat() {
             thinking === null
               ? 'text-slate-400 bg-slate-800 border-slate-700 hover:text-white'
               : thinking
-                ? 'text-purple-300 bg-purple-950/30 border-purple-700/50 hover:border-purple-600'
+                ? 'text-output-300 bg-output-950/30 border-output-700/50 hover:border-output-600'
                 : 'text-slate-300 bg-slate-900 border-slate-600 hover:text-white'
           }`}
         >
@@ -324,7 +324,7 @@ export default function Chat() {
         {messages.length > 0 && (
           <button
             onClick={() => setMessages([])}
-            className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-400 hover:text-red-400 bg-slate-800 border border-slate-700 rounded-lg ml-auto"
+            className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-400 hover:text-crit-400 bg-slate-800 border border-slate-700 rounded-lg ml-auto"
           >
             <Trash2 className="w-3 h-3" /> Clear
           </button>
@@ -337,7 +337,7 @@ export default function Chat() {
           onChange={e => setSystemPrompt(e.target.value)}
           placeholder="System prompt (optional)…"
           rows={3}
-          className="mb-3 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-blue-500"
+          className="mb-3 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-accent-500"
         />
       )}
 
@@ -365,7 +365,7 @@ export default function Chat() {
           placeholder={model ? 'Message… (Enter to send, Shift+Enter for newline)' : 'Select a model first'}
           rows={1}
           style={{ resize: 'none' }}
-          className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-40 overflow-hidden"
+          className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent-500 disabled:opacity-40 overflow-hidden"
           onInput={e => {
             const el = e.currentTarget
             el.style.height = 'auto'
@@ -373,14 +373,14 @@ export default function Chat() {
           }}
         />
         {streaming ? (
-          <button onClick={stop} className="p-3 bg-red-600 hover:bg-red-700 rounded-xl text-white flex-shrink-0" title="Stop">
+          <button onClick={stop} className="p-3 bg-crit-600 hover:bg-crit-700 rounded-xl text-white flex-shrink-0" title="Stop">
             <Loader2 className="w-4 h-4 animate-spin" />
           </button>
         ) : (
           <button
             onClick={send}
             disabled={!model || !input.trim()}
-            className="p-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 rounded-xl text-white flex-shrink-0"
+            className="p-3 bg-accent-500 hover:bg-accent-400 text-slate-950 font-medium disabled:opacity-40 rounded-xl flex-shrink-0"
             title="Send"
           >
             <Send className="w-4 h-4" />

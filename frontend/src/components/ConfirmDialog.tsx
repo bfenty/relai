@@ -23,17 +23,15 @@ export function ConfirmDialog({
       <div className="flex gap-2 justify-end mt-5">
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+          className="btn-ghost"
         >
           Cancel
         </button>
         <button
           onClick={onConfirm}
-          className={`px-4 py-2 text-sm rounded-lg ${
-            dangerous
-              ? 'bg-red-600 hover:bg-red-700'
-              : 'bg-blue-600 hover:bg-blue-700'
-          }`}
+          className={dangerous
+            ? 'btn border-crit-600 bg-crit-600 text-white hover:border-crit-700 hover:bg-crit-700'
+            : 'btn-primary'}
         >
           {confirmLabel}
         </button>

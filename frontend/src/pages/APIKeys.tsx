@@ -78,18 +78,18 @@ function KeyForm({ initial, backends, users, onSubmit, onClose }: {
       <div>
         <label className="block text-sm text-slate-400 mb-1">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Owner <span className="text-slate-500">(optional label)</span></label>
         <input value={owner} onChange={e => setOwner(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       {users.length > 0 && (
         <div>
           <label className="block text-sm text-slate-400 mb-1">User <span className="text-slate-500">(optional)</span></label>
           <select value={userId} onChange={e => setUserId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
             <option value="">— no user —</option>
             {users.map(u => (
               <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
@@ -100,20 +100,20 @@ function KeyForm({ initial, backends, users, onSubmit, onClose }: {
       <div>
         <label className="block text-sm text-slate-400 mb-1">Rate limit <span className="text-slate-500">(requests/min)</span></label>
         <input type="number" value={rateLimit} onChange={e => setRateLimit(Number(e.target.value))} min={1}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
           <input type="checkbox" checked={priority > 0}
             onChange={e => setPriority(e.target.checked ? 1 : 0)}
-            className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800" />
+            className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800" />
           Interactive <span className="text-slate-500">(skip the queue behind long prompts on supporting backends)</span>
         </label>
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Expires <span className="text-slate-500">(optional)</span></label>
         <input type="datetime-local" value={expiresAt} onChange={e => setExpiresAt(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Scopes</label>
@@ -124,7 +124,7 @@ function KeyForm({ initial, backends, users, onSubmit, onClose }: {
                 type="checkbox"
                 checked={scopes.includes(scope.value)}
                 onChange={() => toggleScope(scope.value)}
-                className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800"
+                className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800"
               />
               {scope.label}
             </label>
@@ -149,7 +149,7 @@ function KeyForm({ initial, backends, users, onSubmit, onClose }: {
                   type="checkbox"
                   checked={allowedBackends.includes(b.id)}
                   onChange={() => toggleBackend(b.id)}
-                  className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-700"
+                  className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-700"
                 />
                 {b.name}
                 <span className="text-slate-500 text-xs">{b.base_url}</span>
@@ -160,7 +160,7 @@ function KeyForm({ initial, backends, users, onSubmit, onClose }: {
       )}
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+        <button type="submit" className="btn-primary">
           {initial ? 'Save changes' : 'Create key'}
         </button>
       </div>
@@ -251,16 +251,16 @@ export default function APIKeys() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">API Keys</h2>
-          <p className="text-slate-400 text-sm mt-1">Keys that clients use to authenticate with Relai.</p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">API Keys</h1>
+          <p className="page-description">Keys that clients use to authenticate with Relai.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => createTestKeyMutation.mutate()}
             disabled={createTestKeyMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-800 disabled:opacity-50 rounded-lg text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-warn-600 hover:bg-warn-700 disabled:bg-warn-800 disabled:opacity-50 rounded-lg text-sm"
           >
             <Sparkles className="w-4 h-4" /> Create test key
           </button>
@@ -273,7 +273,7 @@ export default function APIKeys() {
           </button>
           <button
             onClick={() => { setShowCreate(true); setNewKeyValue(null) }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm"
+            className="btn-primary"
           >
             <Plus className="w-4 h-4" /> Create key
           </button>
@@ -281,10 +281,10 @@ export default function APIKeys() {
       </div>
 
       {newKeyValue && (
-        <div className="mb-6 p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
-          <p className="text-sm text-green-400 mb-2 font-medium">Key created — save it now, it won't be shown again.</p>
+        <div className="mb-6 p-4 bg-good-900/30 border border-good-700/50 rounded-lg">
+          <p className="text-sm text-good-400 mb-2 font-medium">Key created — save it now, it won't be shown again.</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 px-3 py-2 bg-slate-900 rounded text-sm font-mono text-green-300">{newKeyValue}</code>
+            <code className="flex-1 px-3 py-2 bg-slate-900 rounded text-sm font-mono text-good-300">{newKeyValue}</code>
             <button onClick={() => copy(newKeyValue)} className="p-2 text-slate-400 hover:text-white" title="Copy">
               <Copy className="w-4 h-4" />
             </button>
@@ -292,16 +292,16 @@ export default function APIKeys() {
         </div>
       )}
 
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+            <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
           </div>
         ) : keys.length === 0 ? (
           <EmptyState icon={Key} message="No API keys yet" hint="Create a key to let clients use the proxy." />
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px]">
+          <table className="table-pro min-w-[960px]">
             <thead>
               <tr className="border-b border-slate-700">
                 <th className="text-left px-6 py-3 text-sm text-slate-400">Name</th>
@@ -323,10 +323,10 @@ export default function APIKeys() {
                   <td className="px-6 py-4 font-medium">
                     {k.name}
                     {k.is_test && (
-                      <span className="ml-2 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">Test</span>
+                      <span className="ml-2 px-1.5 py-0.5 bg-warn-500/20 text-warn-400 rounded text-xs font-medium">Test</span>
                     )}
                     {(k.priority ?? 0) > 0 && (
-                      <span className="ml-2 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">Interactive</span>
+                      <span className="ml-2 px-1.5 py-0.5 bg-slate-700 text-slate-200 rounded text-xs font-medium">Interactive</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-slate-400 text-sm">
@@ -338,7 +338,7 @@ export default function APIKeys() {
                       <span className="text-slate-400">{k.rate_limit_rpm}/min</span>
                       <div className="w-20 h-1 bg-slate-700 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full"
+                          className="h-full bg-slate-400 rounded-full"
                           style={{ width: `${Math.min(100, (k.rate_limit_remaining / k.rate_limit_rpm) * 100)}%` }}
                         />
                       </div>
@@ -362,8 +362,8 @@ export default function APIKeys() {
                   <td className="px-6 py-4">
                     <span className={`inline-flex px-2 py-1 rounded-full text-xs ${
                       !k.is_active ? 'bg-slate-500/20 text-slate-400' :
-                      k.expires_at && new Date(k.expires_at) <= new Date() ? 'bg-red-500/20 text-red-400' :
-                      'bg-green-500/20 text-green-400'
+                      k.expires_at && new Date(k.expires_at) <= new Date() ? 'bg-crit-500/20 text-crit-400' :
+                      'bg-good-500/20 text-good-400'
                     }`}>
                       {!k.is_active ? 'Inactive' : k.expires_at && new Date(k.expires_at) <= new Date() ? 'Expired' : 'Active'}
                     </span>
@@ -373,16 +373,16 @@ export default function APIKeys() {
                       <button
                         onClick={() => updateMutation.mutate({ id: k.id, data: { is_active: !k.is_active } })}
                         title={k.is_active ? 'Deactivate' : 'Activate'}
-                        className="p-1.5 text-slate-400 hover:text-yellow-400 rounded"
+                        className="p-1.5 text-slate-400 hover:text-warn-400 rounded"
                       >
                         {k.is_active
-                          ? <ToggleRight className="w-4 h-4 text-green-400" />
+                          ? <ToggleRight className="w-4 h-4 text-good-400" />
                           : <ToggleLeft className="w-4 h-4" />}
                       </button>
                       <button onClick={() => setEditing(k)} className="p-1.5 text-slate-400 hover:text-white rounded">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setDeleteTarget(k)} className="p-1.5 text-slate-400 hover:text-red-400 rounded">
+                      <button onClick={() => setDeleteTarget(k)} className="p-1.5 text-slate-400 hover:text-crit-400 rounded">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

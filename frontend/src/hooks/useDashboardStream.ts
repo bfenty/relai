@@ -9,29 +9,42 @@ export interface ErrorLogEntry {
 }
 
 /**
- * useDashboardStream connects to /api/dashboard/stream via SSE and
- * invalidates the stats query on incoming stat events so the charts
- * and cards refetch real numbers. Also pushes error log entries to
- * the 'live-errors' query key. Falls back to the existing polling
- * interval if SSE fails.
+ * useDashboardStream connects to /api/dashboard/stream via SSE and refreshes the
+ * stats queries when requests complete, so cards and charts show real numbers
+ * without waiting for the polling interval. Also pushes error log entries to the
+ * 'live-errors' query key. Falls back to the existing polling interval if SSE fails.
+ *
+ * Every completed request emits a stat event, so refreshes are throttled per query:
+ * the dashboard's small "today" aggregate keeps ~1s freshness, while the analytics
+ * query, which aggregates up to 90 days of logs on the server, refreshes from the
+ * stream at most every ANALYTICS_MIN_MS. Hidden tabs never refetch from the stream;
+ * react-query's own polling catches them up when they're shown again.
  */
+const DASHBOARD_MIN_MS = 1000
+const ANALYTICS_MIN_MS = 15000
+
 export function useDashboardStream() {
   const queryClient = useQueryClient()
   const reconnectDelay = useRef(0)
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastAnalytics = useRef(0)
 
   useEffect(() => {
     const baseUrl = window.location.origin
     const es = new EventSource(`${baseUrl}/api/dashboard/stream`)
 
     es.addEventListener('stat', () => {
-      if (refetchTimer.current) return
+      reconnectDelay.current = 0
+      if (refetchTimer.current || document.visibilityState !== 'visible') return
       refetchTimer.current = setTimeout(() => {
         refetchTimer.current = null
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-        queryClient.invalidateQueries({ queryKey: ['analytics'] })
-      }, 1000)
-      reconnectDelay.current = 0
+        const now = Date.now()
+        if (now - lastAnalytics.current >= ANALYTICS_MIN_MS) {
+          lastAnalytics.current = now
+          queryClient.invalidateQueries({ queryKey: ['analytics'] })
+        }
+      }, DASHBOARD_MIN_MS)
     })
 
     es.addEventListener('error', (ev: MessageEvent) => {

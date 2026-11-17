@@ -20,9 +20,9 @@ function fmtK(n: number): string {
 }
 
 function ratioColor(r: number): string {
-  if (r >= 0.9) return 'bg-red-500'
-  if (r >= 0.75) return 'bg-yellow-500'
-  return 'bg-green-500'
+  if (r >= 0.9) return 'bg-crit-500'
+  if (r >= 0.75) return 'bg-warn-500'
+  return 'bg-good-500'
 }
 
 export function PoolBar({ ratio }: { ratio: number }) {
@@ -57,7 +57,7 @@ export function CacheTelemetryCard({ t }: { t: CacheTelemetry }) {
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <div className="flex justify-between"><span className="text-slate-500">Token hit rate</span>
-          <span className="font-mono text-green-400">{(t.token_hit_rate * 100).toFixed(1)}%</span></div>
+          <span className="font-mono text-slate-100">{(t.token_hit_rate * 100).toFixed(1)}%</span></div>
         <div className="flex justify-between"><span className="text-slate-500">Tokens saved</span>
           <span className="font-mono text-slate-300">{fmtK(t.prompt_tokens_saved)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500">Entries</span>
@@ -70,7 +70,7 @@ export function CacheTelemetryCard({ t }: { t: CacheTelemetry }) {
           <span className="font-mono text-slate-300">{fmtK(t.dropped)}</span></div>
         {t.engine_queue_seen && (
           <div className="flex justify-between"><span className="text-slate-500">Engine queue</span>
-            <span className={`font-mono ${t.engine_queued > 0 ? 'text-amber-400' : 'text-slate-300'}`}>
+            <span className={`font-mono ${t.engine_queued > 0 ? 'text-accent-400' : 'text-slate-300'}`}>
               {t.engine_queued}{t.engine_wait_s > 0 ? ` · ${t.engine_wait_s.toFixed(1)}s wait` : ''}
             </span></div>
         )}

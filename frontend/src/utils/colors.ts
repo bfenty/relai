@@ -1,22 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
 import { backendsApi } from '../api/client'
 import { Backend } from '../types'
+import { ENTITY } from '../theme'
 
-export const HOST_PALETTE = [
-  '#3b82f6', // blue
-  '#22c55e', // green
-  '#f59e0b', // amber
-  '#ec4899', // pink
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#f97316', // orange
-  '#10b981', // emerald
-  '#e11d48', // rose
-  '#a78bfa', // lavender
-]
+// Host colors are the theme's entity palette (validated for color-blind separation).
+export const HOST_PALETTE = ENTITY
+
+// Colors offered by the previous palette. A host saved with one of them predates the
+// redesign rather than choosing it, so it gets an entity color by id instead.
+const LEGACY_PALETTE = new Set([
+  '#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6',
+  '#06b6d4', '#f97316', '#10b981', '#e11d48', '#a78bfa',
+])
 
 export function backendColor(b: Backend): string {
-  return b.color || HOST_PALETTE[(b.id - 1) % HOST_PALETTE.length]
+  const saved = b.color?.toLowerCase()
+  if (saved && !LEGACY_PALETTE.has(saved)) return b.color
+  return HOST_PALETTE[(b.id - 1 + HOST_PALETTE.length) % HOST_PALETTE.length]
 }
 
 export function nextColor(usedColors: string[]): string {

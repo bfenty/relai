@@ -24,12 +24,12 @@ function FilterBar({ filters, onChange }: {
         placeholder="Filter by model…"
         value={filters.model ?? ''}
         onChange={e => onChange({ ...filters, model: e.target.value || undefined, offset: 0 })}
-        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500 w-48"
+        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500 w-48"
       />
       <select
         value={filters.backend_id ?? ''}
         onChange={e => onChange({ ...filters, backend_id: e.target.value ? Number(e.target.value) : undefined, offset: 0 })}
-        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500"
       >
         <option value="">All hosts</option>
         {backends.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -37,7 +37,7 @@ function FilterBar({ filters, onChange }: {
       <select
         value={filters.api_key_id ?? ''}
         onChange={e => onChange({ ...filters, api_key_id: e.target.value ? Number(e.target.value) : undefined, offset: 0 })}
-        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500"
       >
         <option value="">All API keys</option>
         {keys.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
@@ -47,7 +47,7 @@ function FilterBar({ filters, onChange }: {
           type="checkbox"
           checked={filters.errors_only ?? false}
           onChange={e => onChange({ ...filters, errors_only: e.target.checked || undefined, offset: 0 })}
-          className="rounded border-slate-500 bg-slate-600 text-red-500 focus:ring-red-500 focus:ring-offset-slate-800"
+          className="rounded border-slate-500 bg-slate-600 text-crit-500 focus:ring-crit-500 focus:ring-offset-slate-800"
         />
         Errors only
       </label>
@@ -55,14 +55,14 @@ function FilterBar({ filters, onChange }: {
         type="date"
         value={filters.from ? filters.from.slice(0, 10) : ''}
         onChange={e => onChange({ ...filters, from: e.target.value ? e.target.value + 'T00:00:00Z' : undefined, offset: 0 })}
-        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500"
       />
       <span className="text-slate-500 self-center text-sm">to</span>
       <input
         type="date"
         value={filters.to ? filters.to.slice(0, 10) : ''}
         onChange={e => onChange({ ...filters, to: e.target.value ? e.target.value + 'T23:59:59Z' : undefined, offset: 0 })}
-        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500"
+        className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500"
       />
       <button
         onClick={() => onChange({ limit: filters.limit })}
@@ -88,7 +88,7 @@ function LogRow({ log, backendName, keyName, backendColor }: {
   return (
     <>
       <tr
-        className={`border-b border-slate-700/50 hover:bg-slate-700/20 ${hasError ? 'bg-red-900/10' : ''} cursor-pointer`}
+        className={`border-b border-slate-700/50 hover:bg-slate-700/20 ${hasError ? 'bg-crit-900/10' : ''} cursor-pointer`}
         onClick={() => hasError && setExpanded(e => !e)}
       >
         <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
@@ -105,17 +105,17 @@ function LogRow({ log, backendName, keyName, backendColor }: {
         <td className="px-4 py-3 text-sm text-slate-400 whitespace-nowrap">
           <span>{log.request_tokens} / {log.response_tokens}</span>
           {log.thinking_tokens > 0 && (
-            <span className="ml-1.5 text-purple-400/70 text-xs">+{log.thinking_tokens}✦</span>
+            <span className="ml-1.5 text-output-400/70 text-xs">+{log.thinking_tokens}✦</span>
           )}
         </td>
         <td className="px-4 py-3 text-sm text-slate-400">${log.cost.toFixed(6)}</td>
         <td className="px-4 py-3 text-sm text-slate-400">{log.latency_ms}ms</td>
         <td className="px-4 py-3">
           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-            log.status_code >= 500 ? 'bg-red-500/20 text-red-400' :
-            log.status_code >= 400 ? 'bg-yellow-500/20 text-yellow-400' :
+            log.status_code >= 500 ? 'bg-crit-500/20 text-crit-400' :
+            log.status_code >= 400 ? 'bg-warn-500/20 text-warn-400' :
             !log.status_code       ? 'bg-slate-500/20 text-slate-400' :
-                                     'bg-green-500/20 text-green-400'
+                                     'bg-good-500/20 text-good-400'
           }`}>
             {hasError && <AlertCircle className="w-3 h-3" />}
             {log.status_code || '—'}
@@ -129,9 +129,9 @@ function LogRow({ log, backendName, keyName, backendColor }: {
         </td>
       </tr>
       {expanded && log.error_message && (
-        <tr className="bg-red-900/10 border-b border-slate-700/50">
+        <tr className="bg-crit-900/10 border-b border-slate-700/50">
           <td colSpan={9} className="px-6 py-3">
-            <p className="text-sm text-red-400 font-mono">{log.error_message}</p>
+            <p className="text-sm text-crit-400 font-mono">{log.error_message}</p>
           </td>
         </tr>
       )}
@@ -142,9 +142,9 @@ function LogRow({ log, backendName, keyName, backendColor }: {
 // ── System Events tab ─────────────────────────────────────────────────────────
 
 const LEVEL_COLORS: Record<string, string> = {
-  info:  'bg-blue-500/20 text-blue-400',
-  warn:  'bg-yellow-500/20 text-yellow-400',
-  error: 'bg-red-500/20 text-red-400',
+  info:  'bg-slate-600/40 text-slate-300',
+  warn:  'bg-warn-500/20 text-warn-400',
+  error: 'bg-crit-500/20 text-crit-400',
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -177,21 +177,21 @@ function EventsTab() {
           {(['info', 'warn', 'error'] as const).map(l => (
             <label key={l} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
               <input type="checkbox" checked={levels[l]} onChange={e => setLevels(v => ({ ...v, [l]: e.target.checked }))}
-                className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800" />
+                className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800" />
               <span className={`px-1.5 py-0.5 rounded text-xs ${LEVEL_COLORS[l]}`}>{l}</span>
             </label>
           ))}
         </div>
         {/* Event type */}
         <select value={filters.type ?? ''} onChange={e => setFilters(f => ({ ...f, type: e.target.value || undefined, offset: 0 }))}
-          className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500">
+          className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500">
           <option value="">All types</option>
           {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         {/* Search */}
         <input type="text" placeholder="Search message…" value={filters.search ?? ''}
           onChange={e => setFilters(f => ({ ...f, search: e.target.value || undefined, offset: 0 }))}
-          className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-blue-500 w-52" />
+          className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-sm text-white focus:outline-none focus:border-accent-500 w-52" />
         <button onClick={() => refetch()} className="p-1.5 text-slate-400 hover:text-white rounded" title="Refresh">
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
@@ -199,10 +199,10 @@ function EventsTab() {
           className="px-3 py-1.5 text-sm text-slate-400 hover:text-white">Clear</button>
       </div>
 
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+            <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
           </div>
         ) : events.length === 0 ? (
           <EmptyState icon={ScrollText} message="No events found" hint="Events are logged for auth, config changes, and proxy errors." />
@@ -294,11 +294,11 @@ export default function Logs() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex gap-0 border-b border-slate-700 mb-6">
+      <div className="flex gap-0 border-b border-slate-700 mb-4">
         {[{ id: 'requests', label: 'Request Logs' }, { id: 'events', label: 'System Events' }].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id as 'requests' | 'events')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === t.id ? 'border-blue-400 text-blue-400' : 'border-transparent text-slate-400 hover:text-white'
+            className={`px-3 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === t.id ? 'border-accent-500 text-slate-50' : 'border-transparent text-slate-400 hover:text-white'
             }`}>
             {t.label}
           </button>
@@ -307,10 +307,10 @@ export default function Logs() {
 
       {activeTab === 'events' ? <EventsTab /> : null}
       {activeTab === 'requests' && <>
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div>
-          <h2 className="text-2xl font-bold">Request Logs</h2>
-          <p className="text-slate-400 text-sm mt-1">{total.toLocaleString()} matching entries</p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">Request Logs</h1>
+          <p className="page-description">{total.toLocaleString()} matching entries</p>
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
@@ -318,7 +318,7 @@ export default function Logs() {
               type="checkbox"
               checked={autoRefresh}
               onChange={e => setAutoRefresh(e.target.checked)}
-              className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800"
+              className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800"
             />
             Auto-refresh
           </label>
@@ -343,16 +343,16 @@ export default function Logs() {
 
       <FilterBar filters={filters} onChange={setFilters} />
 
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+            <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
           </div>
         ) : !data?.data?.length ? (
           <EmptyState icon={ScrollText} message="No logs found" hint="Try adjusting your filters." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table-pro">
               <thead>
                 <tr className="border-b border-slate-700">
                   <th className="text-left px-4 py-3 text-xs text-slate-400 whitespace-nowrap">Time</th>

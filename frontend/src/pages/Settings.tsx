@@ -106,13 +106,16 @@ export default function Settings() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <div className="flex items-center gap-2 mb-6">
-        <h2 className="text-2xl font-bold">Settings</h2>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">Settings</h1>
+          <p className="page-description">Branding, sign-in, storage, metrics export and configuration backup</p>
+        </div>
       </div>
 
       <InfluxSettingsPanel />
 
-      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+      <div className="panel p-4">
         <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Palette className="w-4 h-4 text-slate-400" /> Branding
         </h3>
@@ -128,7 +131,7 @@ export default function Settings() {
                 value={brandingForm.app_name}
                 onChange={e => updateBrandingField('app_name', e.target.value)}
                 placeholder="Relai"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500 text-sm"
               />
             </div>
 
@@ -139,7 +142,7 @@ export default function Settings() {
                   value={brandingForm.logo_url}
                   onChange={e => updateBrandingField('logo_url', e.target.value)}
                   placeholder="https://example.com/logo.svg"
-                  className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+                  className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500 text-sm"
                 />
                 <button
                   type="button"
@@ -165,7 +168,7 @@ export default function Settings() {
                   <input
                     value={brandingForm.primary_color}
                     onChange={e => updateBrandingField('primary_color', e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm font-mono"
+                    className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500 text-sm font-mono"
                   />
                 </div>
               </div>
@@ -181,7 +184,7 @@ export default function Settings() {
                   <input
                     value={brandingForm.accent_color}
                     onChange={e => updateBrandingField('accent_color', e.target.value)}
-                    className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm font-mono"
+                    className="flex-1 min-w-0 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500 text-sm font-mono"
                   />
                 </div>
               </div>
@@ -227,7 +230,7 @@ export default function Settings() {
       </div>
 
       {/* Auth section */}
-      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+      <div className="panel p-4">
         <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
           <SettingsIcon className="w-4 h-4 text-slate-400" /> Authentication
         </h3>
@@ -238,7 +241,7 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+      <div className="panel p-4">
         <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Database className="w-4 h-4 text-slate-400" /> Storage
         </h3>
@@ -252,7 +255,7 @@ export default function Settings() {
           </div>
           <div className="rounded-lg bg-slate-900/60 border border-slate-700 p-3">
             <div className="text-xs text-slate-500 mb-1">Request log backend</div>
-            <div className={storage?.postgres_logs_enabled ? 'text-green-400 font-medium' : 'text-amber-300 font-medium'}>
+            <div className={storage?.postgres_logs_enabled ? 'text-good-400 font-medium' : 'text-warn-300 font-medium'}>
               {storage?.log_backend ?? '...'}
             </div>
           </div>
@@ -270,7 +273,7 @@ export default function Settings() {
         {storage?.warnings?.length ? (
           <div className="mt-4 space-y-2">
             {storage.warnings.map(warning => (
-              <div key={warning} className="flex items-start gap-2 rounded-lg border border-amber-700/50 bg-amber-900/20 px-3 py-2 text-sm text-amber-200">
+              <div key={warning} className="flex items-start gap-2 rounded-lg border border-warn-700/50 bg-warn-900/20 px-3 py-2 text-sm text-warn-200">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 {warning}
               </div>
@@ -280,7 +283,7 @@ export default function Settings() {
       </div>
 
       {/* Config export/import */}
-      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+      <div className="panel p-4">
         <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
           <Download className="w-4 h-4 text-slate-400" /> Config Export / Import
         </h3>
@@ -301,8 +304,8 @@ export default function Settings() {
         </div>
 
         {importResult && (
-          <div className="mt-4 p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
-            <div className="flex items-center gap-2 text-green-400 text-sm font-medium mb-1">
+          <div className="mt-4 p-3 bg-good-900/30 border border-good-700/50 rounded-lg">
+            <div className="flex items-center gap-2 text-good-400 text-sm font-medium mb-1">
               <Check className="w-4 h-4" /> Import complete
             </div>
             <ul className="text-sm text-slate-300 space-y-0.5">
@@ -314,7 +317,7 @@ export default function Settings() {
         )}
 
         {importError && (
-          <div className="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg flex items-start gap-2 text-sm text-red-400">
+          <div className="mt-4 p-3 bg-crit-900/30 border border-crit-700/50 rounded-lg flex items-start gap-2 text-sm text-crit-400">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             {importError}
           </div>

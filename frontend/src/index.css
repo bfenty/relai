@@ -1,20 +1,193 @@
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #0f172a;
+/*
+ * Relai design system.
+ *
+ * Palette, radii and fonts live in tailwind.config.js (every page uses Tailwind's
+ * `slate` name, redefined there, plus semantic `accent`/`input`/`output`/status scales).
+ * This file holds the base and the
+ * few composite classes shared by the shell and the newer pages: panels, page
+ * headers, segmented controls, buttons, tables and KPI tiles. Older pages keep their
+ * inline utility classes and pick up the palette automatically.
+ */
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    line-height: 1.5;
+    color: theme('colors.slate.100');
+    background-color: theme('colors.slate.900');
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  /* Numbers line up in every table and figure. */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.accent.500');
+    outline-offset: 1px;
+  }
+
+  ::selection {
+    background: theme('colors.accent.700');
+    color: white;
+  }
+
+  /* Quiet scrollbars that match the chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.700') transparent;
+  }
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-}
+@layer components {
+  /* ── Containers ───────────────────────────────────────────────────────── */
 
-#root {
-  min-height: 100vh;
+  .panel {
+    @apply rounded-lg border border-slate-700 bg-slate-800;
+  }
+  .panel-header {
+    @apply flex min-h-[40px] flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-700 px-3 py-2;
+  }
+  .panel-title {
+    @apply text-[13px] font-medium text-slate-100;
+  }
+  .panel-subtitle {
+    @apply text-xs text-slate-500;
+  }
+  .panel-body {
+    @apply p-3;
+  }
+
+  /* KPI tiles joined into one strip: the 1px gap shows the border color through. */
+  .kpi-strip {
+    @apply grid gap-px overflow-hidden rounded-lg border border-slate-700 bg-slate-700;
+  }
+  .kpi-strip > .panel {
+    @apply rounded-none border-0;
+  }
+
+  /* The page's one attention banner. */
+  .callout {
+    @apply flex items-center gap-3 rounded-lg border border-accent-500/40 border-l-[3px] border-l-accent-500 bg-accent-500/[0.08] px-3.5 py-2.5;
+  }
+
+  /* Legends sit in the panel header: a swatch and a word, details on hover. */
+  .legend {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400;
+  }
+  .legend-item {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap;
+  }
+  .legend-swatch {
+    @apply inline-block h-2 w-2 shrink-0 rounded-sm;
+  }
+
+  .info-tip {
+    @apply relative inline-flex;
+  }
+  .info-tip-button {
+    @apply rounded-full text-slate-500 transition-colors hover:text-slate-200 focus-visible:text-slate-200;
+  }
+  .info-tip-body {
+    @apply pointer-events-none invisible absolute top-full z-50 mt-1.5 w-72 rounded border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-normal normal-case leading-relaxed tracking-normal text-slate-200 opacity-0 shadow-popover transition-opacity;
+  }
+  .info-tip:hover .info-tip-body,
+  .info-tip:focus-within .info-tip-body {
+    @apply visible opacity-100;
+  }
+
+  /* ── Page header (breadcrumb, title, description, actions) ────────────── */
+
+  .page-header {
+    @apply mb-3 flex flex-wrap items-center justify-between gap-3;
+  }
+  .page-title {
+    @apply text-lg font-semibold leading-tight text-slate-50;
+  }
+  .page-description {
+    @apply text-[13px] text-slate-500;
+  }
+
+  /* ── Controls ─────────────────────────────────────────────────────────── */
+
+  .segmented {
+    @apply inline-flex items-stretch rounded border border-slate-700 bg-slate-900 p-0.5;
+  }
+  .segmented > button {
+    @apply rounded-[3px] px-2.5 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-100;
+  }
+  .segmented > button[aria-pressed='true'] {
+    @apply bg-slate-700 text-slate-50 shadow-panel;
+  }
+
+  .btn {
+    @apply inline-flex h-8 items-center justify-center gap-1.5 rounded border px-3 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn border-accent-500 bg-accent-500 font-semibold text-slate-950 hover:border-accent-400 hover:bg-accent-400;
+  }
+  .btn-secondary {
+    @apply btn border-slate-600 bg-transparent text-slate-100 hover:border-slate-500 hover:bg-slate-700/60;
+  }
+  .btn-ghost {
+    @apply btn border-transparent bg-transparent text-slate-300 hover:bg-slate-700/60 hover:text-slate-50;
+  }
+
+  .field-label {
+    @apply mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  }
+  .input {
+    @apply h-8 rounded border border-slate-600 bg-slate-900 px-2.5 text-[13px] text-slate-100 placeholder:text-slate-500 focus:border-accent-500 focus:outline-none;
+  }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+
+  .table-pro {
+    @apply w-full text-[13px];
+  }
+  .table-pro thead th {
+    @apply sticky top-0 border-b border-slate-700 bg-slate-800 px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-slate-500;
+  }
+  .table-pro tbody td {
+    @apply border-b border-slate-700/60 px-3 py-2 text-slate-200;
+  }
+  .table-pro tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .table-pro tbody tr {
+    @apply transition-colors hover:bg-slate-700/30;
+  }
+
+  /* ── Status ───────────────────────────────────────────────────────────── */
+
+  .live-dot {
+    @apply relative inline-flex h-2 w-2 rounded-full bg-accent-500;
+  }
+  .live-dot::after {
+    content: '';
+    @apply absolute inset-0 animate-ping rounded-full bg-accent-500 opacity-60;
+  }
 }

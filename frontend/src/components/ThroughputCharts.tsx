@@ -1,19 +1,15 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { Gauge } from 'lucide-react'
 import { throughputApi } from '../api/client'
 import type { ThroughputSeries } from '../types'
+import { Panel as UIPanel, type LegendItem } from './ui'
+import { AXIS, GRID, tooltipStyle, sem, entityAt } from '../theme'
 
-const AXIS = { stroke: '#94a3b8', fontSize: 11 }
-const GRID = '#334155'
-const TOOLTIP = {
-  contentStyle: { background: '#1e293b', border: '1px solid #334155', borderRadius: 8 },
-  labelStyle: { color: '#e2e8f0' },
-}
+const TOOLTIP = tooltipStyle
 
 function label(iso: string, interval: string): string {
   const d = new Date(iso)
@@ -21,22 +17,16 @@ function label(iso: string, interval: string): string {
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
-function Panel({ title, hint, children }: {
-  title: string; hint: string; children: React.ReactNode
+function Panel({ title, hint, legend, children }: {
+  title: string; hint: string; legend?: LegendItem[]; children: React.ReactNode
 }) {
   return (
-    <div className="bg-slate-800/60 rounded-lg border border-slate-700 p-4">
-      <div className="mb-2">
-        <div className="text-sm font-medium text-slate-200">{title}</div>
-        <div className="text-xs text-slate-500">{hint}</div>
-      </div>
+    <UIPanel title={title} info={hint} legend={legend}>
       <div className="h-56">{children}</div>
-    </div>
+    </UIPanel>
   )
 }
 
-// Distinct line colors for per-host series; cycles if there are more hosts than colors.
-const HOST_COLORS = ['#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1']
 
 // Per-host aggregate decode rate on the wall clock: each request's tokens are
 // attributed to the real-time seconds its decode window occupied, and
@@ -59,18 +49,18 @@ function PerHostPanel({ rows, hosts }: {
   return (
     <Panel
       title="Per-host decode throughput (aggregate)"
+      legend={hosts.map((h, i) => ({ label: h.name, color: entityAt(i) }))}
       hint="One line per machine, measured on the wall clock: tokens the host emitted per second it actually spent decoding. Concurrent requests share the same second, so this RISES with batching — unlike the per-request rate above, which sags because each stream slows down. The gap between the two charts is the batching win. Only requests logged after this feature shipped carry decode timestamps; earlier history stays blank."
     >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={rows}>
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+          <CartesianGrid vertical={false} stroke={GRID} />
           <XAxis dataKey="label" {...AXIS} />
           <YAxis {...AXIS} unit="" />
           <Tooltip {...TOOLTIP} formatter={(v: number) => `${v.toLocaleString()} tok/s`} />
-          <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
           {hosts.map((h, i) => (
             <Line key={h.id} type="monotone" dataKey={`host-${h.id}`} name={h.name}
-              stroke={HOST_COLORS[i % HOST_COLORS.length]} dot={false} strokeWidth={2} connectNulls />
+              stroke={entityAt(i)} dot={false} strokeWidth={2} connectNulls />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -122,7 +112,7 @@ export default function ThroughputCharts({ hours = 24 }: { hours?: number }) {
   if (isLoading && !data) return <div className="text-slate-400 text-sm">Loading throughput…</div>
   if (isError) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-300">
+      <div className="bg-crit-500/10 border border-crit-500/30 rounded-lg p-4 text-sm text-crit-300">
         Failed to load throughput series: {(error as Error)?.message ?? 'unknown error'}
       </div>
     )
@@ -139,12 +129,7 @@ export default function ThroughputCharts({ hours = 24 }: { hours?: number }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold flex items-center gap-2">
-        <Gauge className="w-5 h-5 text-cyan-400" /> Generation speed
-        <span className="text-xs font-normal text-slate-500">
-          ({(data as ThroughputSeries).interval} buckets)
-        </span>
-      </h3>
+      <div className="text-xs text-slate-500">{(data as ThroughputSeries).interval} buckets</div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Panel
@@ -153,12 +138,12 @@ export default function ThroughputCharts({ hours = 24 }: { hours?: number }) {
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <CartesianGrid vertical={false} stroke={GRID} />
               <XAxis dataKey="label" {...AXIS} />
               <YAxis {...AXIS} unit="" />
               <Tooltip {...TOOLTIP} formatter={(v: number) => `${v.toLocaleString()} tok/s`} />
               <Line type="monotone" dataKey="prefill" name="prefill tok/s"
-                stroke="#38bdf8" dot={false} strokeWidth={2} connectNulls />
+                stroke={sem.input} dot={false} strokeWidth={2} connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </Panel>
@@ -169,12 +154,12 @@ export default function ThroughputCharts({ hours = 24 }: { hours?: number }) {
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={rows}>
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+              <CartesianGrid vertical={false} stroke={GRID} />
               <XAxis dataKey="label" {...AXIS} />
               <YAxis {...AXIS} unit="" />
               <Tooltip {...TOOLTIP} formatter={(v: number) => `${v.toLocaleString()} tok/s`} />
               <Line type="monotone" dataKey="decode" name="decode tok/s"
-                stroke="#22c55e" dot={false} strokeWidth={2} connectNulls />
+                stroke={sem.output} dot={false} strokeWidth={2} connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </Panel>
@@ -186,12 +171,12 @@ export default function ThroughputCharts({ hours = 24 }: { hours?: number }) {
           >
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={rows}>
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                <CartesianGrid vertical={false} stroke={GRID} />
                 <XAxis dataKey="label" {...AXIS} />
                 <YAxis {...AXIS} unit="%" domain={[0, 100]} />
                 <Tooltip {...TOOLTIP} formatter={(v: number) => `${v}%`} />
                 <Line type="monotone" dataKey="accept" name="accepted"
-                  stroke="#a78bfa" dot={false} strokeWidth={2} connectNulls />
+                  stroke={sem.output} dot={false} strokeWidth={2} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </Panel>

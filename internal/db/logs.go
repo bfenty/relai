@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -408,6 +409,16 @@ func (r *LogRepo) DashboardStats(rangeStr string) (*DashboardStats, error) {
 	}
 
 	return stats, nil
+}
+
+// slotExpr is a SQL expression numbering created_at's fixed-size UTC slot: the
+// Unix time divided by seconds, rounded down. Slot n starts at n*seconds.
+func (r *LogRepo) slotExpr(seconds int) string {
+	if r.dialect == "postgres" {
+		return fmt.Sprintf("CAST(FLOOR(EXTRACT(EPOCH FROM created_at) / %d) AS BIGINT)", seconds)
+	}
+	// SQLite keeps CURRENT_TIMESTAMP as UTC text; strftime('%%s') reads it as UTC.
+	return fmt.Sprintf("(CAST(strftime('%%s', created_at) AS INTEGER) / %d)", seconds)
 }
 
 // timeParam converts a time bound for use in a created_at comparison.

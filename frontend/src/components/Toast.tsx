@@ -46,8 +46,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
   const styles: Record<ToastVariant, string> = {
-    success: 'bg-green-900/90 border-green-700 text-green-100',
-    error:   'bg-red-900/90 border-red-700 text-red-100',
+    success: 'bg-good-900/90 border-good-700 text-good-100',
+    error:   'bg-crit-900/90 border-crit-700 text-crit-100',
     info:    'bg-slate-800/90 border-slate-600 text-slate-100',
   }
   const icons: Record<ToastVariant, React.ElementType> = {

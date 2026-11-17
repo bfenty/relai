@@ -23,14 +23,14 @@ export function Modal({ title, onClose, children, size = 'md' }: ModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className={`w-full ${widths[size]} bg-slate-800 rounded-xl border border-slate-700 shadow-xl`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold">{title}</h2>
+      <div className={`w-full ${widths[size]} rounded-lg border border-slate-700 bg-slate-800 shadow-popover`}>
+        <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+          <h2 className="text-[15px] font-semibold">{title}</h2>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white rounded">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="p-4">{children}</div>
       </div>
     </div>,
     document.body

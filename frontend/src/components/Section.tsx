@@ -42,23 +42,21 @@ export default function Section({
   }
 
   return (
-    <section className="bg-slate-800/50 rounded-lg border border-slate-700 mb-4 overflow-hidden">
+    <section className="panel mb-4 overflow-hidden">
       <button
         onClick={toggle}
         aria-expanded={open}
-        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-700/30 transition-colors"
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-700/25 ${open ? 'border-b border-slate-700/80' : ''}`}
       >
         <ChevronDown
-          className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${open ? '' : '-rotate-90'}`}
         />
-        {Icon && <Icon className={`w-4 h-4 shrink-0 ${iconColor}`} />}
-        <span className="font-semibold text-sm">{title}</span>
-        {subtitle && (
-          <span className="text-xs text-slate-500 truncate hidden sm:inline">— {subtitle}</span>
-        )}
-        <span className="ml-auto flex items-center gap-2 shrink-0">{badge}</span>
+        {Icon && <Icon className={`h-4 w-4 shrink-0 ${iconColor}`} />}
+        <span className="panel-title">{title}</span>
+        {subtitle && <span className="hidden truncate text-xs text-slate-500 sm:inline">{subtitle}</span>}
+        <span className="ml-auto flex shrink-0 items-center gap-2">{badge}</span>
       </button>
-      {open && <div className="px-5 pb-5 pt-1">{children}</div>}
+      {open && <div className="p-4">{children}</div>}
     </section>
   )
 }

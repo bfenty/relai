@@ -81,6 +81,7 @@ const (
 	RoutingStickyWait  = "sticky_wait"  // waited for the session's host, then got it
 	RoutingStickySpill = "sticky_spill" // gave up on the session's host, went elsewhere
 	RoutingFresh       = "fresh"        // no session yet; placed by load
+	RoutingPrefixHome  = "prefix_home"  // no session yet; placed on the host holding its shared prefix
 	RoutingDirect      = "direct"       // not routed through a virtual router
 )
 

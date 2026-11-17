@@ -47,7 +47,7 @@ export default function CompressionSelect({
       <select
         value={mode}
         onChange={e => onChange(e.target.value as CompressionMode)}
-        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500"
       >
         {OPTIONS.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>

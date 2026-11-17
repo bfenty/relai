@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import CompressionSelect from '../components/CompressionSelect'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { PageHeader } from '../components/ui'
 import { Modal } from '../components/Modal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -18,9 +20,9 @@ import { useToast } from '../components/Toast'
 
 function HealthBadge({ health }: { health: string }) {
   const map: Record<string, { cls: string; Icon: typeof CheckCircle }> = {
-    active:   { cls: 'bg-green-500/20 text-green-400',  Icon: CheckCircle },
-    degraded: { cls: 'bg-yellow-500/20 text-yellow-400', Icon: AlertTriangle },
-    offline:  { cls: 'bg-red-500/20 text-red-400',      Icon: XCircle },
+    active:   { cls: 'bg-good-500/20 text-good-400',  Icon: CheckCircle },
+    degraded: { cls: 'bg-warn-500/20 text-warn-400', Icon: AlertTriangle },
+    offline:  { cls: 'bg-crit-500/20 text-crit-400',      Icon: XCircle },
   }
   const { cls, Icon } = map[health] ?? map.offline
   return (
@@ -75,19 +77,19 @@ function RouterForm({ initial, onSubmit, onClose }: {
         <label className="block text-sm text-slate-400 mb-1">Virtual model name <span className="text-slate-500">(what clients send as model)</span></label>
         <input value={name} onChange={e => setName(e.target.value)} required
           placeholder="chat"
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Type <span className="text-slate-500">(how this router is reported to clients in /v1/models)</span></label>
         <select value={modelType} onChange={e => setModelType(e.target.value as ModelType)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
           {ROUTER_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Strategy</label>
         <select value={strategy} onChange={e => setStrategy(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
           <option value="sticky">Sticky — wait for session backend (recommended for Strix Halo)</option>
           <option value="cache_aware_sticky">Cache-aware sticky — persistent affinity + KV-cache telemetry</option>
           <option value="round_robin">Round-robin — rotate across members</option>
@@ -101,25 +103,25 @@ function RouterForm({ initial, onSubmit, onClose }: {
           <div>
             <label className="block text-sm text-slate-400 mb-1">Sidecar URL <span className="text-slate-500">(empty = classifier disabled)</span></label>
             <input value={sidecarURL} onChange={e => setSidecarURL(e.target.value)} placeholder="http://classifier:8090/classify"
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-blue-500" />
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-accent-500" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Timeout (ms) <span className="text-slate-500">(0 = 50)</span></label>
               <input type="number" value={sidecarTimeout} onChange={e => setSidecarTimeout(Number(e.target.value))} min={0} max={5000}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
             </div>
             <div>
               <label className="block text-sm text-slate-400 mb-1">Confidence floor</label>
               <input type="number" value={confFloor} onChange={e => setConfFloor(Number(e.target.value))} min={0} max={1} step={0.05}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm text-slate-400 mb-1">Default level <span className="text-slate-500">(fallback)</span></label>
               <select value={defaultLevel} onChange={e => setDefaultLevel(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
                 <option value="">off</option>
                 <option value="low">low</option>
                 <option value="medium">medium</option>
@@ -129,7 +131,7 @@ function RouterForm({ initial, onSubmit, onClose }: {
             <div>
               <label className="block text-sm text-slate-400 mb-1">Mode</label>
               <select value={thinkingMode} onChange={e => setThinkingMode(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
                 <option value="shadow">shadow — log decisions, change nothing</option>
                 <option value="enforce">enforce — inject thinking params</option>
               </select>
@@ -139,7 +141,7 @@ function RouterForm({ initial, onSubmit, onClose }: {
             <label className="block text-sm text-slate-400 mb-1">Param template (JSON) <span className="text-slate-500">(level → backend params; required for enforce)</span></label>
             <textarea value={paramTemplate} onChange={e => setParamTemplate(e.target.value)} rows={3}
               placeholder='{"low":{"thinking":{"type":"disabled"}},"high":{"thinking":{"type":"enabled","budget_tokens":8192}}}'
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-blue-500" />
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-accent-500" />
           </div>
         </div>
       )}
@@ -147,7 +149,7 @@ function RouterForm({ initial, onSubmit, onClose }: {
         <label className="block text-sm text-slate-400 mb-1">Queue timeout <span className="text-slate-500">(seconds to wait for sticky backend)</span></label>
         <input type="number" value={queueTO} onChange={e => setQueueTO(Number(e.target.value))}
           min={5} max={600}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <CompressionSelect
         value={compression}
@@ -157,7 +159,7 @@ function RouterForm({ initial, onSubmit, onClose }: {
       <div className="flex items-center gap-3">
         <button type="button"
           onClick={() => setCacheOn(v => !v)}
-          className={`relative w-10 h-5 rounded-full transition-colors ${cacheOn ? 'bg-blue-600' : 'bg-slate-600'}`}>
+          className={`relative w-10 h-5 rounded-full transition-colors ${cacheOn ? 'bg-accent-500 text-slate-950' : 'bg-slate-600'}`}>
           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cacheOn ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
         <span className="text-sm text-slate-300">Semantic response cache</span>
@@ -167,12 +169,12 @@ function RouterForm({ initial, onSubmit, onClose }: {
           <label className="block text-sm text-slate-400 mb-1">Cache TTL <span className="text-slate-500">(seconds)</span></label>
           <input type="number" value={cacheTTL} onChange={e => setCacheTTL(Number(e.target.value))}
             min={60}
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
         </div>
       )}
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+        <button type="submit" className="px-4 py-2 bg-accent-500 hover:bg-accent-400 text-slate-950 font-medium rounded-lg text-sm">
           {initial ? 'Save changes' : 'Create router'}
         </button>
       </div>
@@ -218,7 +220,7 @@ function AddMemberForm({ routerId, existingMemberIds, onClose }: {
         {available.length === 0
           ? <p className="text-sm text-slate-500">All models are already members of this router.</p>
           : <select value={modelMapId} onChange={e => setModelMapId(Number(e.target.value))} required
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
               <option value="">Select a model…</option>
               {available.map(m => (
                 <option key={m.id} value={m.id}>
@@ -233,12 +235,12 @@ function AddMemberForm({ routerId, existingMemberIds, onClose }: {
           <div>
             <label className="block text-sm text-slate-400 mb-1">Priority <span className="text-slate-500">(higher = preferred for sticky fallback)</span></label>
             <input type="number" value={priority} onChange={e => setPriority(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
           </div>
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
             <button type="submit" disabled={add.isPending}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm disabled:opacity-50">
+              className="px-4 py-2 bg-accent-500 hover:bg-accent-400 text-slate-950 font-medium rounded-lg text-sm disabled:opacity-50">
               Add member
             </button>
           </div>
@@ -322,7 +324,7 @@ function RouterMembers({ router }: { router: Router }) {
                   <td className="py-2 pr-4"><HealthBadge health={s.health} /></td>
                   <td className="py-2 pr-4">
                     {s.active_requests > 0
-                      ? <span className="flex items-center gap-1 text-yellow-400 text-xs">
+                      ? <span className="flex items-center gap-1 text-warn-400 text-xs">
                           <Loader2 className="w-3 h-3 animate-spin" /> busy
                         </span>
                       : <span className="text-slate-600 text-xs">idle</span>}
@@ -330,7 +332,7 @@ function RouterMembers({ router }: { router: Router }) {
                   <td className="py-2 text-right">
                     <button
                       onClick={() => setDeleteTarget(s)}
-                      className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      className="p-1 text-slate-600 hover:text-crit-400 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </td>
@@ -384,10 +386,10 @@ function RouterRow({ router, onEdit, onDelete }: {
     if (status.length === 0) return null
     const offline = status.filter(s => s.health === 'offline').length
     const busy    = status.filter(s => s.active_requests > 0).length
-    if (offline === status.length) return <span className="text-xs text-red-400">all offline</span>
-    if (offline > 0) return <span className="text-xs text-yellow-400">{offline} offline</span>
-    if (busy > 0) return <span className="text-xs text-yellow-400">{busy} busy</span>
-    return <span className="text-xs text-green-400">all idle</span>
+    if (offline === status.length) return <span className="text-xs text-crit-400">all offline</span>
+    if (offline > 0) return <span className="text-xs text-warn-400">{offline} offline</span>
+    if (busy > 0) return <span className="text-xs text-warn-400">{busy} busy</span>
+    return <span className="text-xs text-good-400">all idle</span>
   }
 
   return (
@@ -402,7 +404,7 @@ function RouterRow({ router, onEdit, onDelete }: {
             : <ChevronRight className="w-4 h-4 text-slate-400" />}
         </td>
         <td className="py-3 pr-4">
-          <span className="font-mono text-blue-400 font-medium">{router.name}</span>
+          <span className="font-mono text-slate-100 font-medium">{router.name}</span>
           {router.model_type && router.model_type !== 'chat' && (
             <span className="ml-2 px-1.5 py-0.5 bg-slate-700 rounded text-[10px] uppercase tracking-wide text-slate-300">{router.model_type}</span>
           )}
@@ -414,7 +416,7 @@ function RouterRow({ router, onEdit, onDelete }: {
         <td className="py-3 pr-4">{healthSummary()}</td>
         <td className="py-3 pr-4">
           {router.cache_enabled
-            ? <span className="text-xs text-blue-400">cache {router.cache_ttl_seconds}s</span>
+            ? <span className="text-xs text-cached">cache {router.cache_ttl_seconds}s</span>
             : <span className="text-xs text-slate-600">no cache</span>}
         </td>
         <td className="py-3 text-right pr-4">
@@ -425,7 +427,7 @@ function RouterRow({ router, onEdit, onDelete }: {
               Edit
             </button>
             <button onClick={onDelete}
-              className="px-2 py-1 text-xs text-slate-400 hover:text-red-400 bg-slate-700 hover:bg-slate-600 rounded">
+              className="px-2 py-1 text-xs text-slate-400 hover:text-crit-400 bg-slate-700 hover:bg-slate-600 rounded">
               Delete
             </button>
           </div>
@@ -444,28 +446,9 @@ function RouterRow({ router, onEdit, onDelete }: {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-function TabBar({ active, onChange }: { active: string; onChange: (t: string) => void }) {
-  const tabs = [{ id: 'routers', label: 'Virtual Routers' }, { id: 'routing', label: 'Routing Rules' }]
-  return (
-    <div className="flex gap-0 border-b border-slate-700 mb-0 px-6 pt-6">
-      {tabs.map(t => (
-        <button key={t.id} onClick={() => onChange(t.id)}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            active === t.id
-              ? 'border-blue-400 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-white'
-          }`}>
-          {t.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
 export default function Routers() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const [tab, setTab]                 = useState<'routers' | 'routing'>('routers')
   const [showCreate, setShowCreate]   = useState(false)
   const [editing, setEditing]         = useState<Router | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Router | null>(null)
@@ -495,21 +478,16 @@ export default function Routers() {
 
   return (
     <div>
-      <TabBar active={tab} onChange={t => setTab(t as 'routers' | 'routing')} />
-      {tab === 'routing' ? <Routing /> : null}
-      {tab !== 'routing' && <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Routers</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Virtual model names that load-balance across backends with session affinity and health monitoring.
-          </p>
-        </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium">
-          <Plus className="w-4 h-4" /> New router
-        </button>
-      </div>
+      <PageHeader
+        title="Routers"
+        description="Virtual model names that balance across hosts with sticky, cache-aware routing"
+        actions={
+          <>
+            <Link to="/routers/legacy-rules" className="btn-ghost" title="Routing rules from before virtual routers">Legacy rules</Link>
+            <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus className="h-4 w-4" /> New router</button>
+          </>
+        }
+      />
 
       {isLoading ? (
         <div className="flex items-center gap-2 text-slate-400 py-8">
@@ -519,7 +497,7 @@ export default function Routers() {
         <EmptyState icon={Activity}
           message="No routers yet — create one to expose a virtual model name that balances across multiple backends." />
       ) : (
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div className="panel overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-700 bg-slate-800/50">
@@ -568,7 +546,18 @@ export default function Routers() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-      </div>}
+    </div>
+  )
+}
+
+/** The pre-virtual-router routing rules, kept reachable but out of the main navigation. */
+export function LegacyRoutingRules() {
+  return (
+    <div>
+      <div className="mb-2 text-xs text-slate-500">
+        <Link to="/routers" className="hover:text-slate-300">Routers</Link> / Legacy rules
+      </div>
+      <Routing />
     </div>
   )
 }

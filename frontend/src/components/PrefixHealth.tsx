@@ -4,6 +4,8 @@ import {
 } from 'recharts'
 import { analyticsApi } from '../api/client'
 import type { PrefixCause, PrefixStats } from '../types'
+import { InfoTip } from './ui'
+import { AXIS, GRID, tooltipStyle, legendStyle, sem, status, ui } from '../theme'
 
 /**
  * Why prompts missed the backend's KV cache.
@@ -15,37 +17,49 @@ import type { PrefixCause, PrefixStats } from '../types'
  * because one miss at deep context outweighs a hundred shallow ones.
  */
 
-const CAUSES: Record<PrefixCause, { label: string; color: string; blurb: string }> = {
+// Cause colors carry who can fix it. Client-side rewrites take the input-blue ramp
+// (they turn into fresh prefill; kept clear of the lighter reused-cache blue),
+// brighter for the more expensive fault; causes on
+// relai's side - routing and slot pressure - take the attention orange, because those
+// are the ones to act on here. A healthy append is green, a new conversation neutral.
+const CLIENT = { system: '#5aa3ec', tools: '#5a7fe0', head: '#418ad1', truncated: '#226fb3', tail: '#1a5a94' }
+const ROUTER = { host_change: ui.accent, evicted: '#c25a00' }
+
+export const CAUSES: Record<PrefixCause, { label: string; color: string; blurb: string }> = {
   append: {
-    label: 'Append (healthy)', color: '#22c55e',
+    label: 'Append (healthy)', color: status.good,
     blurb: 'History untouched — only new messages added. Nothing was forfeited.',
   },
   system: {
-    label: 'System prompt changed', color: '#ef4444',
+    label: 'System prompt changed', color: CLIENT.system,
     blurb: 'A system message differed, invalidating the entire prompt. Usually a timestamp or session id injected into the system prompt — the most expensive fault there is, and normally the easiest to fix.',
   },
+  tools: {
+    label: 'Tool list changed', color: CLIENT.tools,
+    blurb: 'The conversation was intact but its tool definitions changed. Tools are rendered ahead of every message, so the entire prompt was reprocessed. Usually an MCP server whose tool list changed mid-session, or tools sent in a different order each turn.',
+  },
   head: {
-    label: 'Early message rewritten', color: '#f97316',
+    label: 'Early message rewritten', color: CLIENT.head,
     blurb: 'A message near the start of the conversation changed, forfeiting everything after it.',
   },
   tail: {
-    label: 'Last message rewritten', color: '#eab308',
+    label: 'Last message rewritten', color: CLIENT.tail,
     blurb: 'Only the final turn or two changed — a retried tool call or an edited message. Cheap, and usually legitimate.',
   },
   truncated: {
-    label: 'History trimmed', color: '#a855f7',
+    label: 'History trimmed', color: CLIENT.truncated,
     blurb: 'The client dropped messages from the front. A sliding context window forfeits the whole cached prefix every time it slides.',
   },
   host_change: {
-    label: 'Moved to another host', color: '#3b82f6',
+    label: 'Moved to another host', color: ROUTER.host_change,
     blurb: 'History was intact but the conversation landed on a different backend, which had no prefix to reuse. A routing cost, not a client one.',
   },
   evicted: {
-    label: 'Slot recycled', color: '#06b6d4',
+    label: 'Slot recycled', color: ROUTER.evicted,
     blurb: 'History was intact and the host was the same, but the cached prefix was gone — the backend is juggling more conversations than its slots or cache-ram can hold.',
   },
   new_conversation: {
-    label: 'New conversation', color: '#64748b',
+    label: 'New conversation', color: sem.neutral,
     blurb: 'Nothing recent resembled this prompt. Cold by nature, not a fault.',
   },
 }
@@ -92,12 +106,12 @@ export default function PrefixHealth({ hours }: { hours: number }) {
   })
 
   if (isError) {
-    return <div className="text-sm text-red-400">{(error as Error)?.message || 'Failed to load'}</div>
+    return <div className="text-sm text-crit-400">{(error as Error)?.message || 'Failed to load'}</div>
   }
   if (isLoading && !data) {
     return (
       <div className="h-32 flex items-center justify-center">
-        <div className="animate-spin w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full" />
+        <div className="animate-spin w-6 h-6 border-2 border-accent-400 border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -129,12 +143,12 @@ export default function PrefixHealth({ hours }: { hours: number }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat label="Diagnosed requests" value={s.diagnosed_requests.toLocaleString()} />
         <Stat label="Attributed faults" value={`${faultRate.toFixed(1)}%`}
-          tone={faultRate > 20 ? 'text-orange-400' : 'text-white'}
+          tone={faultRate > 20 ? 'text-accent-400' : 'text-white'}
           hint={`${s.fault_requests.toLocaleString()} requests`} />
         <Stat label="Reprocessed tokens" value={fmtTokens(s.reprocessed_tokens)}
           hint="prompt re-evaluated from scratch" />
         <Stat label="GPU time lost" value={fmtDuration(s.estimated_seconds)}
-          tone={s.estimated_seconds > 600 ? 'text-red-400' : 'text-white'}
+          tone={s.estimated_seconds > 600 ? 'text-accent-400' : 'text-white'}
           hint="at ~259 tok/s prefill" />
       </div>
 
@@ -168,13 +182,13 @@ export default function PrefixHealth({ hours }: { hours: number }) {
               const meta = CAUSES[c.cause]
               return (
                 <tr key={c.cause} className="border-b border-slate-700/50 last:border-0">
-                  <td className="py-2.5 pr-4">
+                  <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-sm shrink-0"
-                        style={{ backgroundColor: meta?.color ?? '#64748b' }} />
+                        style={{ backgroundColor: meta?.color ?? sem.neutral }} />
                       <span className="font-medium">{meta?.label ?? c.cause}</span>
+                      {meta && <InfoTip>{meta.blurb}</InfoTip>}
                     </div>
-                    {meta && <div className="text-xs text-slate-500 mt-0.5 ml-4.5">{meta.blurb}</div>}
                   </td>
                   <td className="py-2.5 px-3 text-right tabular-nums text-slate-300">
                     {c.requests.toLocaleString()}
@@ -201,15 +215,15 @@ export default function PrefixHealth({ hours }: { hours: number }) {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} />
+                <CartesianGrid vertical={false} stroke={GRID} />
+                <XAxis dataKey="label" {...AXIS} interval="preserveStartEnd" />
+                <YAxis {...AXIS} allowDecimals={false} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, fontSize: 12 }}
+                  {...tooltipStyle}
                   labelFormatter={(_, items) => items?.[0]?.payload?.time
                     ? new Date(items[0].payload.time).toLocaleString() : ''}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Legend wrapperStyle={legendStyle} />
                 {(Object.keys(CAUSES) as PrefixCause[]).map(c => (
                   <Bar key={c} dataKey={CAUSES[c].label} stackId="c" fill={CAUSES[c].color} />
                 ))}
@@ -243,8 +257,8 @@ export default function PrefixHealth({ hours }: { hours: number }) {
                     <td className="py-2 px-3">
                       <span className="text-xs px-2 py-0.5 rounded-full"
                         style={{
-                          backgroundColor: `${CAUSES[o.cause]?.color ?? '#64748b'}20`,
-                          color: CAUSES[o.cause]?.color ?? '#94a3b8',
+                          backgroundColor: `${CAUSES[o.cause]?.color ?? sem.neutral}20`,
+                          color: CAUSES[o.cause]?.color ?? ui.textSecondary,
                         }}>
                         {CAUSES[o.cause]?.label ?? o.cause}
                       </span>

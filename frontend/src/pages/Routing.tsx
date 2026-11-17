@@ -53,12 +53,12 @@ function RuleForm({ initial, onSubmit, onClose }: {
       <div>
         <label className="block text-sm text-slate-400 mb-1">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Strategy</label>
         <select value={strategy} onChange={e => setStrategy(e.target.value)}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
           {STRATEGIES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
         {currentStrategy && (
@@ -70,7 +70,7 @@ function RuleForm({ initial, onSubmit, onClose }: {
           Priority <span className="text-slate-500">(lower number = evaluated first)</span>
         </label>
         <input type="number" value={priority} onChange={e => setPriority(Number(e.target.value))} min={1}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">
@@ -80,7 +80,7 @@ function RuleForm({ initial, onSubmit, onClose }: {
       </div>
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+        <button type="submit" className="btn-primary">
           {initial ? 'Save changes' : 'Create rule'}
         </button>
       </div>
@@ -120,7 +120,7 @@ function RuleRow({ rule, onEdit, onDelete, onToggle }: {
       <td className="px-4 py-4 font-mono text-slate-400 text-sm">{rule.priority}</td>
       <td className="px-4 py-4 font-medium">{rule.name}</td>
       <td className="px-4 py-4">
-        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs" title={strategy?.desc}>
+        <span className="px-2 py-1 bg-slate-700 text-slate-200 rounded text-xs" title={strategy?.desc}>
           {strategy?.label ?? rule.strategy}
         </span>
       </td>
@@ -137,7 +137,7 @@ function RuleRow({ rule, onEdit, onDelete, onToggle }: {
       </td>
       <td className="px-4 py-4">
         <span className={`inline-flex px-2 py-1 rounded-full text-xs ${
-          rule.is_active ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'
+          rule.is_active ? 'bg-good-500/20 text-good-400' : 'bg-slate-500/20 text-slate-400'
         }`}>
           {rule.is_active ? 'Active' : 'Inactive'}
         </span>
@@ -145,15 +145,15 @@ function RuleRow({ rule, onEdit, onDelete, onToggle }: {
       <td className="px-4 py-4">
         <div className="flex items-center justify-end gap-1">
           <button onClick={() => onToggle(rule)} title={rule.is_active ? 'Deactivate' : 'Activate'}
-            className="p-1.5 text-slate-400 hover:text-yellow-400 rounded">
+            className="p-1.5 text-slate-400 hover:text-warn-400 rounded">
             {rule.is_active
-              ? <ToggleRight className="w-4 h-4 text-green-400" />
+              ? <ToggleRight className="w-4 h-4 text-good-400" />
               : <ToggleLeft className="w-4 h-4" />}
           </button>
           <button onClick={() => onEdit(rule)} className="p-1.5 text-slate-400 hover:text-white rounded">
             <Pencil className="w-4 h-4" />
           </button>
-          <button onClick={() => onDelete(rule)} className="p-1.5 text-slate-400 hover:text-red-400 rounded">
+          <button onClick={() => onDelete(rule)} className="p-1.5 text-slate-400 hover:text-crit-400 rounded">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
@@ -236,21 +236,21 @@ export default function Routing() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">Routing Rules</h2>
-          <p className="text-slate-400 text-sm mt-1">Rules are evaluated in priority order. Drag to reorder. Falls back to round-robin when no rule matches.</p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">Routing Rules</h1>
+          <p className="page-description">Rules are evaluated in priority order. Drag to reorder. Falls back to round-robin when no rule matches.</p>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+          className="btn-primary">
           <Plus className="w-4 h-4" /> Add rule
         </button>
       </div>
 
-      <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+            <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
           </div>
         ) : displayed.length === 0 ? (
           <EmptyState icon={GitBranch} message="No routing rules" hint="All requests will use round-robin by default." />
@@ -258,7 +258,7 @@ export default function Routing() {
           <div className="overflow-x-auto">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={displayed.map(r => r.id)} strategy={verticalListSortingStrategy}>
-              <table className="w-full min-w-[600px]">
+              <table className="table-pro min-w-[600px]">
                 <thead>
                   <tr className="border-b border-slate-700">
                     <th className="w-8 px-3 py-3" />

@@ -504,7 +504,7 @@ func TestSelectRoutableMemberSkipsInactiveBackendBeforeProxying(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	sel, err := m.selectRoutableMember(ctx, router, states, []db.RouterMember{*firstMember, *secondMember}, "", 0, nil)
+	sel, err := m.selectRoutableMember(ctx, router, states, []db.RouterMember{*firstMember, *secondMember}, "", 0, sharedPrefix{}, nil)
 	if err != nil {
 		t.Fatalf("selectRoutableMember failed: %v", err)
 	}

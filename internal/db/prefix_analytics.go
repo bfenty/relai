@@ -199,7 +199,7 @@ func (d *DB) PrefixAnalytics(from, to time.Time) (*PrefixStats, error) {
 // through the db package.
 func prefixCauseIsFault(cause string) bool {
 	switch cause {
-	case "system", "head", "tail", "truncated", "host_change", "evicted":
+	case "system", "tools", "head", "tail", "truncated", "host_change", "evicted":
 		return true
 	default:
 		return false
@@ -217,6 +217,7 @@ type PrefixPoint struct {
 	// One field per cause so a stacked chart can show the mix directly.
 	Append          int64 `json:"append"`
 	System          int64 `json:"system"`
+	Tools           int64 `json:"tools"`
 	Head            int64 `json:"head"`
 	Tail            int64 `json:"tail"`
 	Truncated       int64 `json:"truncated"`
@@ -282,6 +283,8 @@ func (d *DB) PrefixTimeSeries(from, to time.Time, interval string) (*PrefixSerie
 			p.Append++
 		case "system":
 			p.System++
+		case "tools":
+			p.Tools++
 		case "head":
 			p.Head++
 		case "tail":

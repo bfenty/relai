@@ -19,6 +19,7 @@ import (
 	"github.com/bfenty/relai/internal/hostlimit"
 	"github.com/bfenty/relai/internal/prefix"
 	"github.com/bfenty/relai/internal/proxy"
+	"github.com/bfenty/relai/internal/queue"
 )
 
 // Manager routes requests for virtual router models across their member backends.
@@ -49,6 +50,10 @@ type Manager struct {
 	// per-message hashes, never prompt content.
 	prefixes *prefix.Tracker
 
+	// prefixHomes remembers which host last processed each shared prefix (tools and
+	// system prompt), so new conversations that open with it land where it's warm.
+	prefixHomes *prefixHomes
+
 	// Per-router round-robin cursor (router ID → atomic counter).
 	rrMu      sync.RWMutex
 	rrCursors map[int64]*atomic.Uint64
@@ -61,10 +66,11 @@ type Manager struct {
 // hostlimit.Slot, so a machine serving several models never runs more
 // concurrent requests than its host capacity allows.
 type memberState struct {
-	mu       sync.Mutex
-	health   string // "active" | "degraded" | "offline"
-	failures int
-	slot     *hostlimit.Slot // shared per-host semaphore
+	mu        sync.Mutex
+	health    string // "active" | "degraded" | "offline"
+	failures  int
+	slot      *hostlimit.Slot // shared per-host semaphore
+	backendID int64           // host, for its learned prefill speed; 0 if unresolved
 }
 
 type sessionEntry struct {
@@ -207,6 +213,7 @@ func NewManager(d *db.DB, p *proxy.Proxy, limiter *hostlimit.Limiter) *Manager {
 		admissions:    make(map[int64]*admissionState),
 		rrCursors:     make(map[int64]*atomic.Uint64),
 		prefixes:      prefix.NewTracker(),
+		prefixHomes:   newPrefixHomes(),
 		healthClient:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -259,7 +266,7 @@ func (m *Manager) Route(w http.ResponseWriter, r *http.Request, router *db.Route
 		return fmt.Errorf("router %q has no members", router.Name)
 	}
 	states := m.getOrCreateStates(dbMembers)
-	sessKey := computeSessionKey(r, body)
+	sessKey, shared := computeRoutingKeys(r, body)
 	// Diagnose the prompt's prefix before proxying. The tracker is keyed by the
 	// caller rather than the session key, because the session key folds in the system
 	// prompt: a client that stamps a timestamp into its system message would get a
@@ -285,7 +292,7 @@ func (m *Manager) Route(w http.ResponseWriter, r *http.Request, router *db.Route
 
 	var decision string
 	selStart := time.Now()
-	sel, err := m.selectRoutableMember(ctx, router, states, dbMembers, sessKey, len(body), &decision)
+	sel, err := m.selectRoutableMember(ctx, router, states, dbMembers, sessKey, len(body), shared, &decision)
 	if err != nil {
 		return err
 	}
@@ -345,6 +352,8 @@ func (m *Manager) Route(w http.ResponseWriter, r *http.Request, router *db.Route
 	sel.state.mu.Lock()
 	sel.state.failures = 0
 	sel.state.mu.Unlock()
+	// Whatever placed this request, its host now holds the shared prefix.
+	m.prefixHomes.set(router.ID, shared.key, sel.member.ModelMapID)
 	if sessKey != "" {
 		if normalizeStrategy(router.Strategy) == "cache_aware_sticky" {
 			m.setPersistentSession(router.ID, sessKey, sel.member.ModelMapID)
@@ -586,10 +595,10 @@ type selectedMember struct {
 	backend  *db.Backend
 }
 
-func (m *Manager) selectRoutableMember(ctx context.Context, router *db.Router, states []*memberState, members []db.RouterMember, sessKey string, promptBytes int, decision *string) (*selectedMember, error) {
+func (m *Manager) selectRoutableMember(ctx context.Context, router *db.Router, states []*memberState, members []db.RouterMember, sessKey string, promptBytes int, shared sharedPrefix, decision *string) (*selectedMember, error) {
 	excluded := make(map[int]bool)
 	for len(excluded) < len(members) {
-		idx, err := m.acquireMember(ctx, router, states, members, sessKey, excluded, promptBytes, decision)
+		idx, err := m.acquireMemberShared(ctx, router, states, members, sessKey, excluded, promptBytes, shared, decision)
 		if err != nil {
 			return nil, err
 		}
@@ -693,6 +702,12 @@ func (m *Manager) logSkippedSelection(router *db.Router, member db.RouterMember,
 }
 
 func (m *Manager) acquireMember(ctx context.Context, router *db.Router, states []*memberState, members []db.RouterMember, sessKey string, excluded map[int]bool, promptBytes int, decision *string) (int, error) {
+	return m.acquireMemberShared(ctx, router, states, members, sessKey, excluded, promptBytes, sharedPrefix{}, decision)
+}
+
+// acquireMemberShared is acquireMember for a request whose shared prefix (tools and
+// system prompt) is known, so first placement can prefer the host holding it.
+func (m *Manager) acquireMemberShared(ctx context.Context, router *db.Router, states []*memberState, members []db.RouterMember, sessKey string, excluded map[int]bool, promptBytes int, shared sharedPrefix, decision *string) (int, error) {
 	setDecisionIfEmpty(decision, proxy.RoutingFresh)
 	switch normalizeStrategy(router.Strategy) {
 	case "round_robin":
@@ -733,11 +748,14 @@ func (m *Manager) acquireMember(ctx context.Context, router *db.Router, states [
 					// host for a budget we already know we will not need. Whales keep
 					// the old wait-first behavior: their re-prefill is the expensive
 					// thing being protected.
-					if anyOtherMemberFree(states, i, excluded) && m.shouldSpillImmediately(router.ID, sessKey, promptBytes) {
+					// What a bounce would cost depends on how fast the hosts it could land
+					// on actually prefill, as measured, not on a fleet-wide constant.
+					rate := m.spillPrefillRate(states, i, excluded)
+					if anyOtherMemberFree(states, i, excluded) && m.shouldSpillImmediatelyAt(router.ID, sessKey, promptBytes, rate) {
 						setDecision(decision, proxy.RoutingStickySpill)
 						break
 					}
-					budget := stickyWaitBudget(promptBytes)
+					budget := stickyWaitBudgetAt(promptBytes, rate)
 					if !anyOtherMemberFree(states, i, excluded) {
 						// Every alternative is busy too. Bouncing would pay a full
 						// reprocess AND still queue, so wait for the warm machine.
@@ -767,10 +785,19 @@ func (m *Manager) acquireMember(ctx context.Context, router *db.Router, states [
 			}
 		}
 
-		// Phase 2 — smart first placement. Use global load, with round-robin
-		// tie-breaking so independent sessions spread across members. The opt-in
-		// cache-aware strategy prefers a host with observed KV-pool headroom, but
-		// falls back to the same least-connections logic if telemetry is absent.
+		// Phase 2 — smart first placement. A host already holding this request's
+		// shared prefix (a sibling sub-agent's tools and system prompt) comes first
+		// when it can take the request; see tryAcquirePrefixHome.
+		if idx := m.tryAcquirePrefixHome(router.ID, states, members, excluded, shared); idx >= 0 {
+			if decision == nil || *decision == proxy.RoutingFresh {
+				setDecision(decision, proxy.RoutingPrefixHome)
+			}
+			return idx, nil
+		}
+		// Otherwise use global load, with round-robin tie-breaking so independent
+		// sessions spread across members. The opt-in cache-aware strategy prefers a
+		// host with observed KV-pool headroom, but falls back to the same
+		// least-connections logic if telemetry is absent.
 		if normalizeStrategy(router.Strategy) == "cache_aware_sticky" {
 			return m.acquireCacheAwareLeastLoaded(ctx, router.ID, states, members, excluded)
 		}
@@ -791,6 +818,15 @@ const spillImmediateBudget = 15 * time.Second
 // falling back to this request's prompt size for a conversation's first busy
 // turn. Missing data biases toward waiting — the conservative side.
 func (m *Manager) shouldSpillImmediately(routerID int64, sessKey string, promptBytes int) bool {
+	return m.shouldSpillImmediatelyAt(routerID, sessKey, promptBytes, prefillTokensPerSecond)
+}
+
+// shouldSpillImmediatelyAt is shouldSpillImmediately for a known prefill rate
+// (tokens/s) on the hosts the conversation would spill to.
+func (m *Manager) shouldSpillImmediatelyAt(routerID int64, sessKey string, promptBytes int, rate float64) bool {
+	if rate <= 0 {
+		rate = prefillTokensPerSecond
+	}
 	if promptBytes <= 0 {
 		// Unknown prompt size: bias toward waiting, same as missing footprint.
 		return false
@@ -801,12 +837,13 @@ func (m *Manager) shouldSpillImmediately(routerID int64, sessKey string, promptB
 			bytes = fb
 		}
 	}
-	cost := time.Duration(float64(bytes) / bytesPerToken / prefillTokensPerSecond * float64(time.Second))
+	cost := time.Duration(float64(bytes) / bytesPerToken / rate * float64(time.Second))
 	return cost <= spillImmediateBudget
 }
 
-// prefillTokensPerSecond is the observed prompt-processing rate for this class of
-// host. Measured on Strix Halo (gfx1151, Qwen3.8-Flash-Next UD-IQ4_XS): roughly
+// prefillTokensPerSecond is the fallback prompt-processing rate, used until the
+// speed learner has measured the hosts involved (see spillPrefillRate). It is the
+// observed rate for this class of host. Measured on Strix Halo (gfx1151, Qwen3.8-Flash-Next UD-IQ4_XS): roughly
 // 200-340 tok/s depending on prompt length, so the conservative end is used - it
 // biases the wait budget upward, which favours keeping a warm cache.
 const prefillTokensPerSecond = 200.0
@@ -830,11 +867,20 @@ const maxStickyWait = 5 * time.Minute
 // re-prefill, while a freshly spawned sub-agent - which has no cache worth keeping -
 // gives up in seconds and lands on a free machine.
 func stickyWaitBudget(promptBytes int) time.Duration {
+	return stickyWaitBudgetAt(promptBytes, prefillTokensPerSecond)
+}
+
+// stickyWaitBudgetAt is stickyWaitBudget for a known prefill rate (tokens/s) on
+// the hosts the request would otherwise go to.
+func stickyWaitBudgetAt(promptBytes int, rate float64) time.Duration {
 	if promptBytes <= 0 {
 		return time.Second
 	}
+	if rate <= 0 {
+		rate = prefillTokensPerSecond
+	}
 	tokens := float64(promptBytes) / bytesPerToken
-	d := time.Duration(tokens / prefillTokensPerSecond * float64(time.Second))
+	d := time.Duration(tokens / rate * float64(time.Second))
 	if d < time.Second {
 		d = time.Second
 	}
@@ -842,6 +888,72 @@ func stickyWaitBudget(promptBytes int) time.Duration {
 		d = maxStickyWait
 	}
 	return d
+}
+
+// minLearnedSamples is how many measured prefills a host needs before its learned
+// rate replaces the default; a couple of odd requests must not steer routing.
+const minLearnedSamples = 5
+
+// Learned rates outside this band are treated as measurement error (a cache read
+// misreported as prefill, a stalled host) and ignored.
+const (
+	minPlausiblePrefill = 20.0
+	maxPlausiblePrefill = 20000.0
+)
+
+// spillPrefillRate is the prefill speed (tokens/s) a cold reprocess would run at
+// if this request left member skip: the slowest learned rate among the other
+// healthy members, so the estimate errs toward waiting for the warm host, as the
+// fixed default does. Falls back to prefillTokensPerSecond while nothing has been
+// learned (fresh start, no streaming traffic, or no learner wired).
+func (m *Manager) spillPrefillRate(states []*memberState, skip int, excluded map[int]bool) float64 {
+	if m.proxy == nil {
+		return prefillTokensPerSecond
+	}
+	speeds := m.proxy.SpeedLearner()
+	if speeds == nil {
+		return prefillTokensPerSecond
+	}
+	rate := 0.0
+	for i, s := range states {
+		if i == skip || (excluded != nil && excluded[i]) || s.getHealth() == "offline" {
+			continue
+		}
+		if r, ok := learnedPrefillRate(speeds, s); ok && (rate == 0 || r < rate) {
+			rate = r
+		}
+	}
+	if rate == 0 {
+		return prefillTokensPerSecond
+	}
+	return rate
+}
+
+// hostPrefillRate is one member's learned prefill speed, or the default.
+func (m *Manager) hostPrefillRate(s *memberState) float64 {
+	if m.proxy != nil {
+		if r, ok := learnedPrefillRate(m.proxy.SpeedLearner(), s); ok {
+			return r
+		}
+	}
+	return prefillTokensPerSecond
+}
+
+// learnedPrefillRate returns a member's measured prefill speed when there is
+// enough of it, in a plausible range, to act on.
+func learnedPrefillRate(speeds *queue.SpeedLearner, s *memberState) (float64, bool) {
+	if speeds == nil || s == nil {
+		return 0, false
+	}
+	id := s.host()
+	if id == 0 {
+		return 0, false
+	}
+	bs := speeds.Get(id)
+	if bs.Samples < minLearnedSamples || bs.PromptTokS < minPlausiblePrefill || bs.PromptTokS > maxPlausiblePrefill {
+		return 0, false
+	}
+	return bs.PromptTokS, true
 }
 
 // anyOtherMemberFree reports whether some member other than skip could take this
@@ -1161,29 +1273,41 @@ func (m *Manager) getOrCreateStates(members []db.RouterMember) []*memberState {
 
 func (m *Manager) getOrCreateState(id int64) *memberState {
 	// Resolve outside the lock; also refreshes the host's capacity from the DB.
-	slot := m.slotForModelMap(id)
+	slot, backendID := m.slotForModelMap(id)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if s, ok := m.members[id]; ok {
+		if backendID != 0 && s.backendID != backendID {
+			s.mu.Lock()
+			s.backendID = backendID // the mapping moved hosts
+			s.mu.Unlock()
+		}
 		return s
 	}
-	s := &memberState{health: "active", slot: slot}
+	s := &memberState{health: "active", slot: slot, backendID: backendID}
 	m.members[id] = s
 	return s
 }
 
 // slotForModelMap resolves a model mapping to its host's shared concurrency
-// slot. When the mapping or backend cannot be resolved, a private single-slot
-// semaphore is returned so routing still degrades gracefully.
-func (m *Manager) slotForModelMap(modelMapID int64) *hostlimit.Slot {
+// slot and the host's ID. When the mapping or backend cannot be resolved, a
+// private single-slot semaphore and ID 0 are returned so routing still degrades
+// gracefully.
+func (m *Manager) slotForModelMap(modelMapID int64) (*hostlimit.Slot, int64) {
 	if m.db != nil {
 		if mm, err := m.db.ModelMaps.Get(modelMapID); err == nil {
 			if b, err := m.db.Backends.Get(mm.BackendID); err == nil {
-				return m.limiter.Slot(b.ID, b.MaxConcurrent)
+				return m.limiter.Slot(b.ID, b.MaxConcurrent), b.ID
 			}
 		}
 	}
-	return hostlimit.NewSlot(1)
+	return hostlimit.NewSlot(1), 0
+}
+
+func (s *memberState) host() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.backendID
 }
 
 // ─── Session affinity ────────────────────────────────────────────────────────
@@ -1246,6 +1370,19 @@ func (m *Manager) setPersistentSession(routerID int64, key string, modelMapID in
 // changes its shape hash and loses affinity. That was already true of the shape-only
 // path; it now also applies to callers sending an explicit session id.
 func computeSessionKey(r *http.Request, body []byte) string {
+	key, _ := computeRoutingKeys(r, body)
+	return key
+}
+
+// routingMessage is the part of a chat message routing looks at.
+type routingMessage struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
+}
+
+// computeRoutingKeys parses the body once for both routing keys: the session key
+// (see computeSessionKey) and the shared prefix (see sharedPrefixOf).
+func computeRoutingKeys(r *http.Request, body []byte) (string, sharedPrefix) {
 	identity := ""
 	if sid := r.Header.Get("X-Session-ID"); sid != "" {
 		identity = "h:" + sid
@@ -1254,40 +1391,36 @@ func computeSessionKey(r *http.Request, body []byte) string {
 	}
 
 	var req struct {
-		User     string `json:"user"`
-		Messages []struct {
-			Role    string          `json:"role"`
-			Content json.RawMessage `json:"content"`
-		} `json:"messages"`
+		User     string           `json:"user"`
+		Tools    json.RawMessage  `json:"tools"`
+		Messages []routingMessage `json:"messages"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		// Unparseable body: an explicit header is all we have to go on.
-		return identity
+		return identity, sharedPrefix{}
 	}
 	if identity == "" && req.User != "" {
 		identity = "u:" + req.User
 	}
+	shared := sharedPrefixOf(req.Tools, req.Messages)
 
 	shape := conversationShape(req.Messages)
 	switch {
 	case shape == "" && identity == "":
-		return ""
+		return "", shared
 	case shape == "":
-		return identity
+		return identity, shared
 	case identity == "":
-		return "s:" + shape
+		return "s:" + shape, shared
 	default:
-		return identity + "|" + shape
+		return identity + "|" + shape, shared
 	}
 }
 
 // conversationShape hashes the stable opening of a conversation: every system or
 // developer message plus the first user message. It deliberately stops there, because
 // the full prompt grows with every turn and would change the key each time.
-func conversationShape(messages []struct {
-	Role    string          `json:"role"`
-	Content json.RawMessage `json:"content"`
-}) string {
+func conversationShape(messages []routingMessage) string {
 	h := sha256.New()
 	found := false
 	for _, msg := range messages {
@@ -1548,6 +1681,7 @@ func (m *Manager) sessionCleanupLoop(ctx context.Context) {
 				}
 			}
 			m.sessMu.Unlock()
+			m.prefixHomes.prune()
 			if m.db != nil && m.db.RouterAffinities != nil {
 				_ = m.db.RouterAffinities.DeleteOlderThan(threshold.UTC().Format(time.RFC3339))
 			}

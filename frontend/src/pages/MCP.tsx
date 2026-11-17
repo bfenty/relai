@@ -33,12 +33,12 @@ function MCPForm({ initial, onSubmit, onClose }: {
         <label className="block text-sm text-slate-400 mb-1">Name</label>
         <input value={name} onChange={e => setName(e.target.value)} required
           placeholder="my-rag-server"
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Transport</label>
         <select value={transport} onChange={e => setTransport(e.target.value as 'http' | 'stdio')}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500">
           <option value="http">HTTP / SSE</option>
           <option value="stdio">stdio</option>
         </select>
@@ -48,7 +48,7 @@ function MCPForm({ initial, onSubmit, onClose }: {
           <label className="block text-sm text-slate-400 mb-1">URL</label>
           <input value={url} onChange={e => setUrl(e.target.value)}
             placeholder="http://localhost:3001/mcp"
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
         </div>
       )}
       <div>
@@ -57,22 +57,22 @@ function MCPForm({ initial, onSubmit, onClose }: {
         </label>
         <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)}
           placeholder={initial ? '••••••••' : 'Optional'}
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <div>
         <label className="block text-sm text-slate-400 mb-1">Description</label>
         <input value={description} onChange={e => setDescription(e.target.value)}
           placeholder="Optional notes about this server's capabilities"
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-accent-500" />
       </div>
       <label className="flex items-center gap-2 cursor-pointer select-none">
         <input type="checkbox" checked={isEnabled} onChange={e => setIsEnabled(e.target.checked)}
-          className="rounded border-slate-500 bg-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-800" />
+          className="rounded border-slate-500 bg-slate-600 text-accent-500 focus:ring-accent-500 focus:ring-offset-slate-800" />
         <span className="text-sm text-slate-300">Enabled</span>
       </label>
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose} className="px-4 py-2 text-slate-400 hover:text-white text-sm">Cancel</button>
-        <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+        <button type="submit" className="btn-primary">
           {initial ? 'Save changes' : 'Add server'}
         </button>
       </div>
@@ -114,31 +114,28 @@ export default function MCP() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">MCP Servers</h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Manage Model Context Protocol servers for tool use and RAG access.
-            Relai can proxy and gate access to these servers per API key.
-          </p>
+      <div className="page-header">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="page-title">MCP Servers</h1>
+          <p className="page-description">Model Context Protocol servers for tools and RAG, gated per API key</p>
         </div>
         <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">
+          className="btn-primary">
           <Plus className="w-4 h-4" /> Add server
         </button>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="animate-spin w-7 h-7 border-2 border-blue-400 border-t-transparent rounded-full" />
+          <div className="animate-spin w-7 h-7 border-2 border-accent-400 border-t-transparent rounded-full" />
         </div>
       ) : servers.length === 0 ? (
         <EmptyState icon={Puzzle}
           message="No MCP servers configured"
           hint="Add an MCP server to enable tool use and RAG capabilities for your models." />
       ) : (
-        <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-          <table className="w-full">
+        <div className="panel overflow-hidden">
+          <table className="table-pro">
             <thead>
               <tr className="border-b border-slate-700">
                 <th className="text-left px-4 py-3 text-xs text-slate-400">Name</th>
@@ -163,7 +160,7 @@ export default function MCP() {
                   </td>
                   <td className="px-4 py-3 text-sm text-slate-400">{s.description || <span className="text-slate-600">—</span>}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs ${s.is_enabled ? 'bg-green-500/20 text-green-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${s.is_enabled ? 'bg-good-500/20 text-good-400' : 'bg-slate-500/20 text-slate-400'}`}>
                       {s.is_enabled ? 'enabled' : 'disabled'}
                     </span>
                   </td>
@@ -172,7 +169,7 @@ export default function MCP() {
                       <button onClick={() => setEditing(s)} className="p-1.5 text-slate-400 hover:text-white rounded">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setDeleteTarget(s)} className="p-1.5 text-slate-400 hover:text-red-400 rounded">
+                      <button onClick={() => setDeleteTarget(s)} className="p-1.5 text-slate-400 hover:text-crit-400 rounded">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

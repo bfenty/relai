@@ -254,3 +254,60 @@ func TestBlamesSeparatesFaultsFromHealthyTraffic(t *testing.T) {
 		}
 	}
 }
+
+func bodyWithTools(tools string, msgs ...msg) []byte {
+	m := map[string]any{"messages": msgs}
+	if tools != "" {
+		m["tools"] = json.RawMessage(tools)
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+const toolsA = `[{"type":"function","function":{"name":"read_file"}}]`
+const toolsB = `[{"type":"function","function":{"name":"read_file"}},{"type":"function","function":{"name":"write_file"}}]`
+
+func TestChangedToolsForfeitWholePrompt(t *testing.T) {
+	prev := Compute(bodyWithTools(toolsA, sys("bot"), user("hello"), asst("hi")))
+	cur := Compute(bodyWithTools(toolsB, sys("bot"), user("hello"), asst("hi"), user("more")))
+	d := Compare(prev, cur)
+	if d.Cause != CauseTools {
+		t.Fatalf("cause = %q, want tools", d.Cause)
+	}
+	if d.Retained != 0 || d.DivergedAt != 0 {
+		t.Errorf("tools precede every message: want nothing retained, got retained=%.2f diverged=%d", d.Retained, d.DivergedAt)
+	}
+	if !d.Costly() || !Blames(d.Cause) {
+		t.Error("a tool-list change is a fixable, costly fault")
+	}
+}
+
+func TestToolWhitespaceIsNotAChange(t *testing.T) {
+	spaced := "[ {\"type\": \"function\", \"function\": {\"name\": \"read_file\"}} ]"
+	prev := Compute(bodyWithTools(toolsA, sys("bot"), user("hello")))
+	cur := Compute(bodyWithTools(spaced, sys("bot"), user("hello"), asst("hi")))
+	if d := Compare(prev, cur); d.Cause != CauseAppend {
+		t.Fatalf("cause = %q, want append: whitespace never reaches the prompt", d.Cause)
+	}
+}
+
+func TestNoToolsAndEmptyToolsAreTheSame(t *testing.T) {
+	prev := Compute(bodyWithTools("", sys("bot"), user("hello")))
+	cur := Compute(bodyWithTools("[]", sys("bot"), user("hello"), asst("hi")))
+	if d := Compare(prev, cur); d.Cause != CauseAppend {
+		t.Fatalf("cause = %q, want append", d.Cause)
+	}
+}
+
+func TestTrackerMatchesConversationAcrossToolChange(t *testing.T) {
+	tr := NewTracker()
+	tr.Observe("k", Compute(bodyWithTools(toolsA, sys("bot"), user("unrelated"))))
+	tr.Observe("k", Compute(bodyWithTools(toolsA, sys("bot"), user("hello"), asst("hi"))))
+	d := tr.Observe("k", Compute(bodyWithTools(toolsB, sys("bot"), user("hello"), asst("hi"), user("more"))))
+	if d.Cause != CauseTools {
+		t.Fatalf("cause = %q, want tools: the predecessor is the conversation that lines up", d.Cause)
+	}
+}

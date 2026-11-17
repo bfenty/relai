@@ -16,6 +16,7 @@
 package prefix
 
 import (
+	"bytes"
 	"encoding/json"
 	"hash/fnv"
 	"sync"
@@ -31,6 +32,10 @@ type Fingerprint struct {
 	Hashes   []uint64
 	CumBytes []int64
 	Roles    []string
+	// Tools hashes the request's tool definitions (0 when there are none). Chat
+	// templates render tools ahead of every message, so a changed tool list
+	// invalidates the whole prompt even when every message is untouched.
+	Tools uint64
 }
 
 func (f Fingerprint) Len() int { return len(f.Hashes) }
@@ -70,6 +75,7 @@ func Compute(body []byte) Fingerprint {
 			// cache just as a changed message would.
 			ToolCalls json.RawMessage `json:"tool_calls"`
 		} `json:"messages"`
+		Tools json.RawMessage `json:"tools"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil || len(req.Messages) == 0 {
 		return Fingerprint{}
@@ -83,6 +89,7 @@ func Compute(body []byte) Fingerprint {
 		Hashes:   make([]uint64, 0, n),
 		CumBytes: make([]int64, 0, n),
 		Roles:    make([]string, 0, n),
+		Tools:    hashTools(req.Tools),
 	}
 	var cum int64
 	for _, m := range req.Messages[:n] {
@@ -98,6 +105,23 @@ func Compute(body []byte) Fingerprint {
 		f.Roles = append(f.Roles, m.Role)
 	}
 	return f
+}
+
+// hashTools fingerprints a tools array. It is compacted first: the backend
+// re-serializes tools when rendering the template, so whitespace never reaches the
+// prompt, but order and content do.
+func hashTools(tools json.RawMessage) uint64 {
+	t := bytes.TrimSpace(tools)
+	if len(t) == 0 || bytes.Equal(t, []byte("null")) || bytes.Equal(t, []byte("[]")) {
+		return 0
+	}
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, t); err == nil {
+		t = compact.Bytes()
+	}
+	h := fnv.New64a()
+	h.Write(t)
+	return h.Sum64()
 }
 
 // Causes of a cache miss, ordered roughly by how actionable they are.
@@ -118,6 +142,11 @@ const (
 	// is a suffix of what it sent before. A sliding context window does this, and it
 	// forfeits the whole cached prefix every time it slides.
 	CauseTruncated = "truncated"
+	// CauseTools means the tool definitions changed while the conversation itself
+	// did not. Tools render ahead of every message, so this forfeits the entire
+	// prompt: usually an MCP server whose tool list changed mid-session, or a client
+	// that sends its tools in a different order each turn.
+	CauseTools = "tools"
 	// CauseNewConversation means nothing recent resembles this prompt. Cold by
 	// nature, not a fault.
 	CauseNewConversation = "new_conversation"
@@ -131,6 +160,10 @@ type Diff struct {
 	DivergedAt int
 	PrevLen    int
 	NewLen     int
+	// matched is how many messages line up with the predecessor, used to pick the
+	// right predecessor even when the cause (a tool change) means none of them
+	// could be reused.
+	matched int
 	// Retained is the fraction of the previous prompt's bytes that survive as a
 	// reusable prefix - the ceiling on what cached_tokens can report.
 	Retained float64
@@ -147,7 +180,16 @@ func Compare(prev, cur Fingerprint) Diff {
 	}
 
 	lcp := commonPrefix(prev, cur)
-	d := Diff{DivergedAt: lcp, PrevLen: prev.Len(), NewLen: cur.Len()}
+	d := Diff{DivergedAt: lcp, PrevLen: prev.Len(), NewLen: cur.Len(), matched: lcp}
+
+	// The same conversation (its messages still line up) with different tools: the
+	// change sits ahead of every message, so nothing is reusable.
+	if lcp > 0 && prev.Tools != cur.Tools {
+		d.Cause = CauseTools
+		d.DivergedAt = 0
+		d.Retained = 0
+		return d
+	}
 	if prev.bytes() > 0 {
 		d.Retained = float64(prev.bytesThrough(lcp)) / float64(prev.bytes())
 	}
@@ -311,7 +353,7 @@ func (t *Tracker) Observe(key string, fp Fingerprint) Diff {
 		d := Compare(t.entries[i].fp, fp)
 		// Prefer the predecessor sharing the most messages; that is the one whose
 		// KV prefix the backend would actually have been holding.
-		score := d.DivergedAt
+		score := d.matched
 		if d.Cause == CauseTruncated && score == 0 {
 			score = 1 // a detected window slide beats no match at all
 		}
@@ -395,7 +437,7 @@ func Classify(cause string, promptTokens, cachedTokens int, spilled bool) string
 // healthy traffic or a conversation seen for the first time.
 func Blames(cause string) bool {
 	switch cause {
-	case CauseSystem, CauseHead, CauseTail, CauseTruncated, CauseHostChange, CauseEvicted:
+	case CauseSystem, CauseTools, CauseHead, CauseTail, CauseTruncated, CauseHostChange, CauseEvicted:
 		return true
 	default:
 		return false

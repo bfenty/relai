@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { InfoTip } from './ui'
 import { GitCompareArrows, Zap, Database, Server, AlertTriangle } from 'lucide-react'
 import { analyticsApi } from '../api/client'
 import type { RoutingStats } from '../types'
@@ -14,11 +15,10 @@ function bytes(n: number): string {
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 const num = (n: number) => n.toLocaleString()
 
-/** Green when healthy, amber when marginal, red when it needs attention. */
-function rateTone(v: number, good: number, poor: number): string {
-  if (v >= good) return 'text-green-400'
-  if (v >= poor) return 'text-amber-400'
-  return 'text-red-400'
+/** Plain when healthy or marginal; the attention color once it falls below `poor`.
+ *  Status colors stay reserved for host health and errors. */
+function rateTone(v: number, poor: number): string {
+  return v >= poor ? 'text-slate-50' : 'text-accent-400'
 }
 
 function Stat({ label, value, tone, hint }: {
@@ -46,7 +46,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
   }
   if (isError) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-sm text-red-300">
+      <div className="bg-crit-500/10 border border-crit-500/30 rounded-lg p-4 text-sm text-crit-300">
         Failed to load routing analytics: {(error as Error)?.message ?? 'unknown error'}
       </div>
     )
@@ -61,7 +61,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Zap className="w-5 h-5 text-amber-400" /> Routing &amp; cache health
+          <Zap className="w-5 h-5 text-slate-400" /> Routing &amp; cache health
         </h3>
         <span className="text-xs text-slate-500">
           {num(measured)} measured of {num(d.total_requests)} requests · last {hours}h
@@ -72,7 +72,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
           excluded from the rates rather than dragging them toward zero. */}
       {d.unmeasured_requests > 0 && (
         <div className="flex items-start gap-2 text-xs text-slate-400 bg-slate-800/40 border border-slate-700 rounded-lg p-3">
-          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <AlertTriangle className="w-4 h-4 text-warn-400 shrink-0 mt-0.5" />
           <span>
             {num(d.unmeasured_requests)} request{d.unmeasured_requests === 1 ? '' : 's'} predate
             routing instrumentation and carry no cache data. They are excluded from the
@@ -91,25 +91,25 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
             <Stat
               label="Cache reuse"
               value={pct(d.cache_reuse_rate)}
-              tone={rateTone(d.cache_reuse_rate, 0.6, 0.3)}
+              tone={rateTone(d.cache_reuse_rate, 0.3)}
               hint="Share of prompt tokens served from the upstream KV cache"
             />
             <Stat
               label="Sticky hit rate"
               value={pct(d.sticky_hit_rate)}
-              tone={rateTone(d.sticky_hit_rate, 0.6, 0.3)}
+              tone={rateTone(d.sticky_hit_rate, 0.3)}
               hint="Conversations routed back to the host holding their context"
             />
             <Stat
               label="Reprocessed"
               value={num(d.reprocessed_tokens)}
-              tone={d.reprocessed_tokens > 0 ? 'text-amber-400' : 'text-green-400'}
+              tone="text-slate-50"
               hint="Prompt tokens the upstreams had to prefill again"
             />
             <Stat
               label="Compression saved"
               value={bytes(d.compression_bytes_saved)}
-              tone={d.compression_bytes_saved > 0 ? 'text-green-400' : 'text-slate-400'}
+              tone={d.compression_bytes_saved > 0 ? 'text-slate-50' : 'text-slate-400'}
               hint={d.compressed_requests > 0
                 ? `across ${num(d.compressed_requests)} compressed request${d.compressed_requests === 1 ? '' : 's'}`
                 : 'no target has compression enabled'}
@@ -118,7 +118,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Stat label="Spill rate" value={pct(d.spill_rate)}
-              tone={d.spill_rate > 0.1 ? 'text-amber-400' : 'text-slate-300'}
+              tone={d.spill_rate > 0.1 ? 'text-accent-400' : 'text-slate-50'}
               hint="Gave up on the warm host and paid a reprocess" />
             <Stat label="Mean wait" value={`${num(d.mean_wait_ms)} ms`}
               hint="Time spent waiting for a host" />
@@ -129,13 +129,13 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
           {d.decision_stats && Object.keys(d.decision_stats).length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                <GitCompareArrows className="w-4 h-4 text-emerald-400" /> Per decision economics
+                <GitCompareArrows className="w-4 h-4 text-slate-400" /> Per decision economics
+                <InfoTip>
+                  Spills are saving time when sticky_spill shows low mean wait and modest
+                  reprocessed tokens while sticky_wait waits run long. The reverse means spills
+                  are paying cache misses for nothing.
+                </InfoTip>
               </h4>
-              <p className="text-xs text-slate-500 mb-2">
-                Spill verdict: spills are saving time when sticky_spill shows low mean wait and
-                modest reprocessed tokens while sticky_wait waits run long. The reverse means
-                spills are paying cache misses for nothing.
-              </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -160,7 +160,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
                             <td className="py-1.5 pr-4 text-right tabular-nums">{num(st.mean_wait_ms)} ms</td>
                             <td className="py-1.5 pr-4 text-right tabular-nums">{num(st.mean_latency_ms)} ms</td>
                             <td className="py-1.5 pr-4 text-right tabular-nums">{num(st.reprocessed_tokens)}</td>
-                            <td className={`py-1.5 pr-4 text-right tabular-nums ${rateTone(reuse, 0.6, 0.3)}`}>
+                            <td className={`py-1.5 pr-4 text-right tabular-nums ${rateTone(reuse, 0.3)}`}>
                               {pct(reuse)}
                             </td>
                           </tr>
@@ -174,7 +174,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
 
           <div>
             <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-              <Server className="w-4 h-4 text-blue-400" /> Per host
+              <Server className="w-4 h-4 text-slate-400" /> Per host
             </h4>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -195,7 +195,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
                       <td className="py-2 pr-4">{h.backend_name}</td>
                       <td className="py-2 pr-4 text-right tabular-nums">{num(h.requests)}</td>
                       <td className="py-2 pr-4 text-right tabular-nums">{pct(h.share)}</td>
-                      <td className={`py-2 pr-4 text-right tabular-nums ${rateTone(h.cache_reuse_rate, 0.6, 0.3)}`}>
+                      <td className={`py-2 pr-4 text-right tabular-nums ${rateTone(h.cache_reuse_rate, 0.3)}`}>
                         {pct(h.cache_reuse_rate)}
                       </td>
                       <td className="py-2 pr-4 text-right tabular-nums">{num(h.mean_latency_ms)} ms</td>
@@ -211,7 +211,7 @@ export default function RoutingHealth({ hours = 24 }: { hours?: number }) {
 
           <div>
             <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-              <Database className="w-4 h-4 text-purple-400" /> Routing decisions
+              <Database className="w-4 h-4 text-slate-400" /> Routing decisions
             </h4>
             <div className="flex flex-wrap gap-2">
               {Object.entries(d.decisions)
